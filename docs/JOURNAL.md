@@ -984,6 +984,89 @@ can change one line and re-run the whole comparison.
 
 ---
 
+## Weekend 10 - the other direction
+
+**Goal:** information had only ever flowed inwards. A shelter transmitted into silence and
+never learned whether anyone heard it, and the base had no way to tell anyone anything. The
+Ed25519 signing built in weekend 3 had sat unused for seven weekends waiting for this.
+
+### Two messages, two different problems
+
+**An order** - evacuate, boil water before drinking, a collection point is open. This is the
+message somebody would want to forge, and it is why the authority tier exists at all. A
+shelter must be able to *verify* an evacuation order without holding anything that would
+let it *write* one. The 4-byte HMAC used for reports cannot do that: a shared secret good
+enough to check a message is also good enough to forge one. Only a public-key signature
+separates reading from writing, and that is what the 64 bytes buy - sixteen times the size
+of a report's tag, for a reason that can be stated in one sentence.
+
+**A digest** - a list of what the base already holds. It answers the question a shelter
+could not otherwise answer at all, which is whether its report ever arrived, and it lets a
+relay stop repeating things that are already home.
+
+Both are told apart from a situation report by the version in the leading three bits:
+reports are version 1, broadcasts version 2. No length guessing, no ambiguity.
+
+### A signature is necessary and not sufficient
+
+A recording of a genuine evacuation order is a *genuine* evacuation order. It verifies
+perfectly. Played back the next day it is a lie, and no amount of cryptography on the
+message itself notices.
+
+So every broadcast carries when it was issued and a sequence number, and a station accepts
+one only if it is newer than the last it accepted. Anything claiming to be more than three
+hours old is treated as a recording rather than an instruction.
+
+| what arrives | what a shelter does |
+|---|---|
+| a genuine order | **obeys** |
+| signed by somebody else | refuses: signature does not verify |
+| altered after signing | refuses: signature does not verify |
+| the same order played again | refuses: already seen this one |
+| a recording from 400 minutes ago | refuses: treating as a replay |
+
+All five are in the self check, so a change that quietly breaks replay protection fails the
+build rather than the field.
+
+### What it costs, and the claim that was wrong
+
+| message | bytes | airtime |
+|---|---|---|
+| a situation report | 16 | 2.28 s |
+| an order | 72 | 6.76 s |
+| a digest of 12 shelters | 106 | 9.48 s |
+
+The first version of the digest measurement was **wrong in the direction that flattered
+it**. One relay holding five reports, the base acknowledging three: the digest cost 7.32 s
+and saved 6.84 s of repeats. Net **minus half a second**. The text written beside it
+claimed it paid for itself after three cancellations, which the number directly beneath it
+contradicted.
+
+The error was measuring one relay. A digest is transmitted once and heard by *every*
+station within earshot at the same moment, so what it saves multiplies by how many are
+listening:
+
+| shelters acknowledged | digest costs | 1 relay | 2 relays | 4 relays |
+|---|---|---|---|---|
+| 3 | 7.32 s | **-0.5 s** | +6.4 s | +20.0 s |
+| 6 | 8.04 s | +5.6 s | +19.3 s | +46.7 s |
+| 12 | 9.48 s | +17.9 s | +45.2 s | +100.0 s |
+| 24 | 12.36 s | +42.4 s | +97.1 s | +206.5 s |
+
+One relay and three shelters is the only losing case, and it loses half a second. Airtime
+is not the only return either: a shelter that hears its own number in the digest has been
+told its report arrived, which nothing else in the system could tell it.
+
+### Where the key lives
+
+The office's signing key is generated once and kept offline; only the public half is
+distributed, printed on the back of a receiver or handed out before the season. A station
+holding the public key can check every order ever issued and forge none of them. For the
+demonstration the key is fixed in `trust.py` so the whole thing is reproducible, and it
+says so in the file.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -1002,6 +1085,7 @@ the island half does not know what a tone is.
 | `soundout/island/situation.py` | the 12-byte schema and its bit packing |
 | `soundout/island/trust.py` | HMAC tags, Ed25519, key derivation |
 | `soundout/island/reports.py` | compose, authenticate, ingest |
+| `soundout/island/authority.py` | signed orders and digests, and refusing replays |
 | `soundout/island/relay.py` | which observations to pass on, and in what order |
 | `soundout/island/store.py` | the observation set and the fold |
 | `tools/` | the things a human runs |
@@ -1031,3 +1115,4 @@ refactor changed nothing.
 - [ ] Over a handheld radio, and across a room at distance
 - [x] Store and forward: stations repeat what they heard, worst first
 - [x] The comparison against a runner, cellular and nothing, with the chart
+- [x] Signed orders outwards, and a digest that says what arrived

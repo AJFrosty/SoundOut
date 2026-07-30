@@ -62,6 +62,27 @@ def payload_of(row):
     return bytes.fromhex(row["raw"]) + bytes.fromhex(row["tag"])
 
 
+def suppress(store, holdings):
+    """Stop repeating what the base has already told us it holds.
+
+    The base periodically broadcasts a digest of the newest report it has from each
+    shelter. Anything at or behind that mark is home; repeating it spends airtime to tell
+    somebody something they said first. Returns how many were dropped from the queue.
+    """
+    dropped = 0
+
+    for shelter, minutes in holdings:
+        cursor = store.connection.execute(
+            "UPDATE observations SET relayed = relayed + 1 "
+            "WHERE shelter = ? AND minutes <= ? AND relayed = 0",
+            (shelter, minutes),
+        )
+        dropped += cursor.rowcount
+
+    store.connection.commit()
+    return dropped
+
+
 def mark_relayed(store, row):
     store.connection.execute(
         "UPDATE observations SET relayed = relayed + 1 WHERE raw = ?", (row["raw"],))

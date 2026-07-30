@@ -11,10 +11,11 @@ import time
 import numpy as np
 import sounddevice as sd
 
-from soundout.island import relay, validate
+from soundout.island import authority, relay, validate
 from soundout.island.reports import ingest
 from soundout.island.situation import describe
 from soundout.island.store import Store
+from soundout.island.trust import Authority
 from soundout.radio.link import transmit
 from soundout.radio.tones import RATE
 
@@ -98,6 +99,8 @@ def main():
                         help="lead each repeat with a VOX wake-up tone")
     parser.add_argument("--trust-anything", action="store_true",
                         help="also pass on reports whose tag did not verify")
+    parser.add_argument("--no-authority", action="store_true",
+                        help="ignore signed broadcasts from the base")
     parser.add_argument("--listen-only", action="store_true",
                         help="behave as a plain receiver, for comparison")
     args = parser.parse_args()
@@ -116,6 +119,8 @@ def main():
 
     store = Store(args.db)
     station = Station(store, args, np.random.default_rng())
+    bulletin = None if args.no_authority else authority.Bulletin(
+        Authority.demo().public_bytes())
 
     print(f"relay station on {sd.query_devices(device)['name']}")
     print("listening only — nothing will be repeated" if args.listen_only else
@@ -143,9 +148,17 @@ def main():
                     quiet_since = time.monotonic()
 
                 while len(buffer) >= window_samples:
-                    outcome = ingest(buffer[:window_samples], store)
+                    outcome = ingest(buffer[:window_samples], store, bulletin=bulletin)
 
-                    if outcome["stored"]:
+                    if outcome.get("broadcast"):
+                        if "message" in outcome:
+                            print(f"[{time.strftime('%H:%M:%S')}] >> "
+                                  f"{outcome['description']}")
+                            if outcome.get("suppressed"):
+                                print(f"           {outcome['suppressed']} report(s) "
+                                      f"no longer need repeating")
+                        buffer = buffer[window_samples:]
+                    elif outcome["stored"]:
                         mark = "OK " if outcome["authentic"] else "!! "
                         note = "" if outcome["fresh"] else "  (already had this one)"
                         print(f"[{time.strftime('%H:%M:%S')}] {mark}"

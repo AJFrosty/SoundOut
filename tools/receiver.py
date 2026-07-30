@@ -11,9 +11,10 @@ import time
 import numpy as np
 import sounddevice as sd
 
-from soundout.island import validate
+from soundout.island import authority, validate
 from soundout.island.reports import ingest
 from soundout.island.store import Store
+from soundout.island.trust import Authority
 from soundout.radio.tones import RATE
 
 LONGEST_FRAME_S = 3.0
@@ -35,8 +36,26 @@ def default_input():
     raise SystemExit("no input device — plug in a microphone or enable Stereo Mix")
 
 
-def handle(signal, store, verbose):
-    outcome = ingest(signal, store)
+
+def show_broadcast(outcome):
+    """An order or an acknowledgement from the base, rather than a report inwards."""
+    stamp = time.strftime("%H:%M:%S")
+
+    if "message" not in outcome:
+        print(f"[{stamp}] .. a broadcast was refused: {outcome['reason']}")
+        return
+
+    print(f"[{stamp}] >> {outcome['description']}")
+    if outcome.get("suppressed"):
+        print(f"           {outcome['suppressed']} report(s) no longer need repeating")
+
+
+def handle(signal, store, verbose, bulletin=None):
+    outcome = ingest(signal, store, bulletin=bulletin)
+
+    if outcome.get("broadcast"):
+        show_broadcast(outcome)
+        return True
 
     if not outcome["stored"]:
         if verbose and outcome["burst"]["found"]:
@@ -62,6 +81,8 @@ def main():
                         help="how much audio to examine at once")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--quiet", action="store_true", help="no level meter")
+    parser.add_argument("--no-authority", action="store_true",
+                        help="ignore signed broadcasts from the base")
     args = parser.parse_args()
 
     try:
@@ -72,6 +93,8 @@ def main():
 
     device = chosen if chosen is not None else default_input()
     store = Store(args.db)
+    bulletin = None if args.no_authority else authority.Bulletin(
+        Authority.demo().public_bytes())
 
     window_samples = int(RATE * window_s)
     keep_samples = int(RATE * LONGEST_FRAME_S)
@@ -112,7 +135,7 @@ def main():
                     last_meter = now
 
                 while len(buffer) >= window_samples:
-                    if handle(buffer[:window_samples], store, args.verbose):
+                    if handle(buffer[:window_samples], store, args.verbose, bulletin):
                         buffer = buffer[window_samples:]
                     else:
                         buffer = buffer[window_samples - keep_samples:]

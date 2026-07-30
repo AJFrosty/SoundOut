@@ -17,10 +17,10 @@ MODULES = [
     "soundout.radio.wav", "soundout.radio.devices",
     "soundout.island.situation", "soundout.island.trust",
     "soundout.island.reports", "soundout.island.store", "soundout.island.validate",
-    "soundout.island.relay",
+    "soundout.island.relay", "soundout.island.authority",
     "tools.report", "tools.receiver", "tools.listen", "tools.dashboard",
-    "tools.airtest", "tools.loopback", "tools.audiocheck", "tools.relay",
-    "experiments.comparison", "experiments.chart",
+    "tools.airtest", "tools.loopback", "tools.audiocheck", "tools.relay", "tools.broadcast",
+    "experiments.comparison", "experiments.chart", "experiments.authoritytest",
 ]
 
 PASS = "ok  "
@@ -124,6 +124,52 @@ def check_relay():
 
     middle.close()
     base.close()
+    return healthy
+
+
+def check_authority():
+    from soundout.island import authority
+    from soundout.island.reports import ingest, sign_broadcast
+    from soundout.island.trust import Authority
+    from soundout.radio.link import transmit
+    from soundout.radio.tones import RATE
+
+    print("\norders from the base cannot be forged or replayed")
+    office, impostor = Authority.demo(), Authority()
+    issued = 500_000
+
+    def over_air(payload, bulletin):
+        signal = transmit(payload)
+        return ingest(np.concatenate([np.zeros(int(RATE * 0.3)), signal,
+                                      np.zeros(int(RATE * 0.3))]), None, bulletin=bulletin)
+
+    def fresh():
+        return authority.Bulletin(office.public_bytes(), now_minutes=issued)
+
+    body = authority.encode_order(issued, 3, "evacuate now", scope="zone", target=3)
+    genuine = sign_broadcast(body, office)
+    healthy = True
+
+    outcome = over_air(genuine, fresh())
+    healthy &= line(PASS if "message" in outcome else FAIL,
+                    "a genuine order arrives", outcome.get("description", ""))
+
+    outcome = over_air(sign_broadcast(body, impostor), fresh())
+    healthy &= line(PASS if "message" not in outcome else FAIL,
+                    "one signed by somebody else is refused")
+
+    altered = bytearray(genuine)
+    altered[6] ^= 0x01
+    outcome = over_air(bytes(altered), fresh())
+    healthy &= line(PASS if "message" not in outcome else FAIL,
+                    "one altered after signing is refused")
+
+    listener = fresh()
+    over_air(genuine, listener)
+    outcome = over_air(genuine, listener)
+    healthy &= line(PASS if "message" not in outcome else FAIL,
+                    "a recording played again is refused")
+
     return healthy
 
 
@@ -307,7 +353,8 @@ def main():
         raise SystemExit(1)
 
     print()
-    results = [check_imports(), check_pipeline(), check_relay(), check_noise(),
+    results = [check_imports(), check_pipeline(), check_relay(),
+               check_authority(), check_noise(),
                check_field_page(), check_stale_audio()]
 
     if not args.skip_audio:

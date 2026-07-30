@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
 from ..radio.link import receive
+from . import authority
 from .situation import REPORT_BYTES, decode_report, describe, encode_report
-from .trust import TAG_BYTES, derive_key, tag, verify_tag
+from .trust import SIGNATURE_BYTES, TAG_BYTES, derive_key, tag, verify_tag
 
 EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -37,11 +38,53 @@ def authenticate(payload):
     return body, verify_tag(body, received, derive_key(reporter)), None
 
 
-def ingest(signal, store, rate=None):
+def sign_broadcast(body, office):
+    return body + office.sign(body)
+
+
+def _take_broadcast(result, store, bulletin):
+    """A broadcast is not stored as an observation; it is an instruction or an answer."""
+    payload = result["payload"]
+
+    if len(payload) <= SIGNATURE_BYTES:
+        return {"stored": False, "reason": "broadcast too short to carry a signature",
+                "burst": result["burst"]}
+
+    body, signature = payload[:-SIGNATURE_BYTES], payload[-SIGNATURE_BYTES:]
+
+    if bulletin is None:
+        return {"stored": False, "broadcast": True,
+                "reason": "a broadcast arrived but no authority key is configured",
+                "burst": result["burst"]}
+
+    message, error = bulletin.accept(body, signature)
+    if error:
+        return {"stored": False, "broadcast": True, "reason": error,
+                "burst": result["burst"]}
+
+    applied = 0
+    if message["kind"] == authority.DIGEST and store is not None:
+        from . import relay
+        applied = relay.suppress(store, message["holdings"])
+
+    return {
+        "stored": False,
+        "broadcast": True,
+        "message": message,
+        "description": authority.describe(message),
+        "suppressed": applied,
+        "burst": result["burst"],
+    }
+
+
+def ingest(signal, store, rate=None, bulletin=None):
     result = receive(signal) if rate is None else receive(signal, rate=rate)
 
     if not result["ok"]:
         return {"stored": False, "reason": result["error"], "burst": result["burst"]}
+
+    if authority.is_broadcast(result["payload"]):
+        return _take_broadcast(result, store, bulletin)
 
     body, authentic, error = authenticate(result["payload"])
     if error:

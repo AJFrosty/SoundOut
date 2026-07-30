@@ -136,6 +136,43 @@ path, delivers it through a noisy channel, lists your audio devices, and flags a
 files left over from an older frame format. Audio recorded before a format change cannot
 decode and has to be regenerated — the check names those files.
 
+## The other direction
+
+The base can talk back. Two kinds of message, signed with Ed25519 rather than tagged:
+
+```
+python -m tools.broadcast --order "evacuate now" --scope zone --target 3 --within 2
+python -m tools.broadcast --digest --db soundout.db
+```
+
+An **order** is the message somebody would want to forge, so a shelter must be able to
+verify one without holding anything that would let it write one - which a shared HMAC key
+cannot do, and a public key can. That is what the 64-byte signature buys.
+
+A **digest** lists what the base already holds. It tells a shelter its report arrived, and
+it lets relays stop repeating what is already home.
+
+A signature alone is not enough: a recording of a real evacuation order is a real
+evacuation order. Every broadcast carries an issue time and a sequence number, and a
+station accepts one only if it is newer than the last it accepted.
+
+| what arrives | what happens |
+|---|---|
+| a genuine order | obeyed |
+| signed by somebody else | refused |
+| altered after signing | refused |
+| the same order played again | refused |
+| a recording from 400 minutes ago | refused |
+
+| message | bytes | airtime |
+|---|---|---|
+| a situation report | 16 | 2.28 s |
+| an order | 72 | 6.76 s |
+| a digest of 12 shelters | 106 | 9.48 s |
+
+`tools/receiver.py` and `tools/relay.py` verify broadcasts automatically; pass
+`--no-authority` to ignore them.
+
 ## Is it worth it?
 
 `docs/comparison.svg` puts SoundOut against what an island actually has. The measure is
