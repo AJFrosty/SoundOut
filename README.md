@@ -145,7 +145,15 @@ which was used - it finds the preamble, then tries each mode until one passes.
 python -m tools.report --shelter 37 --people 42 --mode farthest
 python -m experiments.rangegain      # what each mode buys
 python -m experiments.response       # where your speaker is actually loudest
+python -m tools.rangetest --distance 2 --note quiet
+python -m tools.rangetest --summary  # the curve, once you have a few
 ```
+
+`rangetest` listens for half a minute, finds every burst in the recording and says what
+happened to each one: heard and decoded, or heard but lost, or never heard at all. That
+distinction is the whole diagnosis. A healthy PSR with failing frames means the data is
+the limit, so slow down. A PSR sliding towards 8 means the preamble is the limit, and no
+amount of error correction will help.
 
 | mode | rate | airtime | works down to | range |
 |---|---|---|---|---|
