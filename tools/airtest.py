@@ -3,13 +3,13 @@ import argparse
 import numpy as np
 import sounddevice as sd
 
-from goertzel import RATE
-from message import receive, transmit
-from situation import REPORT_BYTES, describe, encode_report
-from trust import ShelterKeys, tag
+from soundout.island.reports import build_report
+from soundout.island.situation import REPORT_BYTES, describe
+from soundout.radio.link import receive, transmit
+from soundout.radio.tones import RATE
 
 REPORT = dict(
-    reporter=1041, shelter=37, occupancy=42, capacity=60,
+    reporter=1041, shelter=37, people=42, capacity=60,
     needs=["water", "insulin"], casualties=2, access="impassable", minutes=1_234_567,
 )
 
@@ -91,18 +91,15 @@ if __name__ == "__main__":
         payload = args.text.encode("utf-8")
         expect = args.text
     else:
-        keys = ShelterKeys()
-        keys.issue(REPORT["reporter"])
-        packed = encode_report(**REPORT)
-        payload = packed + tag(packed, keys.get(REPORT["reporter"]))
-        expect = describe(packed)
+        payload = build_report(**REPORT)
+        expect = describe(payload[:REPORT_BYTES])
 
     outcome = run(payload, in_device, out_device, args.amplitude)
 
     if isinstance(outcome, tuple):
         heard, result = outcome
         if args.wav:
-            from play import write_wav
+            from soundout.radio.wav import write_wav
             write_wav(args.wav, heard)
             print(f"saved: {args.wav}")
 

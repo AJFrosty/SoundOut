@@ -1,6 +1,6 @@
 import numpy as np
 
-from goertzel import RATE
+from .tones import RATE
 
 CHIRP_MS = 100
 CHIRP_LOW = 800
@@ -82,3 +82,16 @@ def find_burst(signal, template=None, rate=RATE, guard_ms=GUARD_MS, min_psr=8.0)
         "match": match,
         "found": psr >= min_psr and chirp_start >= 0,
     }
+
+
+def find_start_by_energy(recorded, block=256, threshold=0.25):
+    blocks = len(recorded) // block
+    rms = np.array([
+        np.sqrt(np.mean(recorded[i * block:(i + 1) * block] ** 2)) for i in range(blocks)
+    ])
+
+    if rms.max() < 1e-6:
+        raise SystemExit("recorded silence - check the output device and the volume")
+
+    loud = np.flatnonzero(rms > rms.max() * threshold)
+    return int(loud[0] * block)

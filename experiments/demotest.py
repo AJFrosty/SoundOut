@@ -1,13 +1,11 @@
 import numpy as np
 
-from goertzel import RATE
-from loopback import through_simulated_channel
-from message import transmit
-from receiver import authenticate, handle
-from report import build
-from situation import decode_report
-from store import Store
-from trust import derive_key, tag
+from soundout.island.reports import build_report, ingest
+from soundout.island.situation import decode_report, encode_report
+from soundout.island.store import Store
+from soundout.radio.channel import through_simulated_channel
+from soundout.radio.link import transmit
+from soundout.radio.tones import RATE
 
 RNG = np.random.default_rng(41)
 
@@ -24,6 +22,17 @@ SHELTERS = [
 ]
 
 
+def report_line(outcome):
+    if not outcome["stored"]:
+        print(f"  lost: {outcome['reason']}")
+        return
+
+    mark = "OK " if outcome["authentic"] else "!! "
+    print(f"  {mark}{outcome['description']}")
+    if not outcome["authentic"]:
+        print("      authentication FAILED - stored but not trusted")
+
+
 def over_air(payload, snr_db):
     signal = transmit(payload, amplitude=0.6)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
@@ -34,12 +43,12 @@ def run(snr_db=5.0):
     store = Store()
     print(f"four transmissions through a {snr_db:.0f} dB channel, in a shuffled order\n")
 
-    payloads = [build(**s) for s in SHELTERS]
+    payloads = [build_report(**s) for s in SHELTERS]
     order = list(RNG.permutation(len(payloads)))
 
     for index in order:
         heard = over_air(payloads[index], snr_db)
-        handle(heard, store, verbose=True)
+        report_line(ingest(heard, store))
 
     print("\nthe picture that assembled itself:")
     for shelter in store.view():
@@ -65,15 +74,14 @@ def forgery_is_rejected():
     print("\na looter with a stolen handset invents a report")
     store = Store()
 
-    genuine = build(reporter=1041, shelter=37, people=42, capacity=60,
+    genuine = build_report(reporter=1041, shelter=37, people=42, capacity=60,
                     needs=["water"], casualties=0, access="open", minutes=1_000_200)
-    handle(over_air(genuine, 20), store, verbose=False)
+    report_line(ingest(over_air(genuine, 20), store))
 
-    from situation import encode_report
     fake_body = encode_report(reporter=1041, shelter=37, occupancy=0, capacity=60,
                               needs=[], casualties=0, access="open", minutes=1_000_300)
     forged = fake_body + b"\x00\x00\x00\x00"
-    handle(over_air(forged, 20), store, verbose=False)
+    report_line(ingest(over_air(forged, 20), store))
 
     trusted = store.view()
     everything = store.view(include_unverified=True)

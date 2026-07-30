@@ -2,7 +2,7 @@ import argparse
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from store import Store
+from soundout.island.store import Store
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><title>SoundOut — island picture</title>

@@ -3,10 +3,10 @@ import argparse
 import numpy as np
 import sounddevice as sd
 
-from goertzel import RATE
-from message import receive
-from situation import REPORT_BYTES, describe
-from trust import TAG_BYTES
+from soundout.island.situation import REPORT_BYTES, describe
+from soundout.island.trust import TAG_BYTES
+from soundout.radio.link import receive
+from soundout.radio.tones import RATE
 
 
 def pick_input():
@@ -63,7 +63,7 @@ def main():
     print(f"level  : peak {peak:.4f}, rms {rms:.4f} — {verdict}")
 
     if args.wav:
-        from play import write_wav
+        from soundout.radio.wav import write_wav
         write_wav(args.wav, signal)
         print(f"saved  : {args.wav}")
 

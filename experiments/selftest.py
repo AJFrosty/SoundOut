@@ -1,6 +1,6 @@
 import numpy as np
 
-from goertzel import (
+from soundout.radio.tones import (
     RATE,
     SYMBOL_MS,
     TONES,

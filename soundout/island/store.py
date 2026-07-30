@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone
 
-from situation import ACCESS, NEEDS, decode_report, needs_list
+from .situation import ACCESS, NEEDS, decode_report, needs_list
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS observations (

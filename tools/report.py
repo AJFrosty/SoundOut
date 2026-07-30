@@ -1,33 +1,10 @@
 import argparse
-from datetime import datetime, timezone
-
 import numpy as np
 
-from goertzel import RATE
-from message import transmit
-from situation import NEEDS, describe, encode_report
-from trust import derive_key, tag
-
-EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
-
-
-def minutes_now():
-    return int((datetime.now(timezone.utc) - EPOCH).total_seconds() // 60)
-
-
-def build(reporter, shelter, people, capacity, needs, casualties, access, minutes=None):
-    packed = encode_report(
-        reporter=reporter,
-        shelter=shelter,
-        occupancy=people,
-        capacity=capacity,
-        needs=needs,
-        casualties=casualties,
-        access=access,
-        minutes=minutes if minutes is not None else minutes_now(),
-    )
-    return packed + tag(packed, derive_key(reporter))
-
+from soundout.radio.link import transmit
+from soundout.radio.tones import RATE
+from soundout.island.reports import build_report
+from soundout.island.situation import NEEDS, describe
 
 def main():
     parser = argparse.ArgumentParser(description="compose and transmit a situation report")
@@ -46,8 +23,8 @@ def main():
     args = parser.parse_args()
 
     needs = [n.strip() for n in args.needs.split(",") if n.strip()]
-    payload = build(args.reporter, args.shelter, args.people, args.capacity,
-                    needs, args.casualties, args.access)
+    payload = build_report(args.reporter, args.shelter, args.people, args.capacity,
+                           needs, args.casualties, args.access)
 
     signal = transmit(payload, amplitude=args.amplitude)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
@@ -57,7 +34,7 @@ def main():
     print(f"airtime : {len(signal) / RATE:.2f} s")
 
     if args.wav:
-        from play import write_wav
+        from soundout.radio.wav import write_wav
         write_wav(args.wav, padded)
         print(f"wrote   : {args.wav}")
 

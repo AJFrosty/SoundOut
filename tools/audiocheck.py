@@ -4,7 +4,7 @@ import time
 import numpy as np
 import sounddevice as sd
 
-from goertzel import RATE, tone
+from soundout.radio.tones import RATE, tone
 
 DURATION = 1.5
 

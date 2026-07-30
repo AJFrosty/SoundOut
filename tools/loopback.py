@@ -5,7 +5,9 @@ import time
 import numpy as np
 import sounddevice as sd
 
-from goertzel import RATE, SYMBOL_MS, TONES, decode, encode, symbol_length
+from soundout.radio.channel import through_simulated_channel
+from soundout.radio.preamble import find_start_by_energy as find_start
+from soundout.radio.tones import RATE, SYMBOL_MS, TONES, decode, encode, symbol_length
 
 LEAD_IN_S = 0.4
 TAIL_S = 0.4
@@ -24,35 +26,6 @@ def pick_input(preferred="stereo mix"):
 
     return inputs[0][0]
 
-
-def through_simulated_channel(padded, snr_db, rng, out_delay=None):
-    delay = rng.integers(int(RATE * 0.05), int(RATE * 0.30))
-    if out_delay is not None:
-        out_delay.append(int(delay))
-    delayed = np.concatenate([np.zeros(delay), padded, np.zeros(int(RATE * 0.2))])
-
-    smoothed = np.convolve(delayed, np.ones(3) / 3.0, mode="same")
-    gain = float(rng.uniform(0.2, 0.9))
-    faded = smoothed * gain
-
-    signal_power = np.mean(faded[faded != 0] ** 2) if np.any(faded) else 1.0
-    noise_power = signal_power / (10.0 ** (snr_db / 10.0))
-    noisy = faded + rng.normal(0.0, np.sqrt(noise_power), len(faded))
-
-    return np.clip(noisy, -0.95, 0.95)
-
-
-def find_start(recorded, block=256, threshold=0.25):
-    blocks = len(recorded) // block
-    rms = np.array([
-        np.sqrt(np.mean(recorded[i * block:(i + 1) * block] ** 2)) for i in range(blocks)
-    ])
-
-    if rms.max() < 1e-6:
-        raise SystemExit("recorded silence - check the output device and the volume")
-
-    loud = np.flatnonzero(rms > rms.max() * threshold)
-    return int(loud[0] * block)
 
 
 def run(count, in_device, out_device, amplitude, simulate_snr=None, oracle_sync=False):

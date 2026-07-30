@@ -476,29 +476,30 @@ every two seconds.
 
 ## Files
 
-| file | what it is |
+Laid out along the seam in the design: the radio half does not know what a shelter is, and
+the island half does not know what a tone is.
+
+| where | what it is |
 |---|---|
-| `goertzel.py` | the detector and the 4-FSK encoder — the core of the project |
-| `preamble.py` | the chirp, the matched filter, and the detection statistics |
-| `situation.py` | the 12-byte schema and its bit packing |
-| `trust.py` | HMAC tags for reports, Ed25519 for authority broadcasts |
-| `calibrate.py` | where the detection threshold came from |
-| `airtest.py` | play and record at once — the real over-the-air test |
-| `listen.py` | record and decode whatever is heard |
-| `store.py` | the observation set and the fold that becomes the picture |
-| `storetest.py` | order independence, idempotence, tie breaks, quarantine |
-| `report.py` | compose and transmit a report from the command line |
-| `receiver.py` | listen continuously, authenticate, merge |
-| `dashboard.py` | the island picture on localhost, no dependencies |
-| `demotest.py` | four reports over a noisy channel into one picture |
-| `schematest.py` | schema round trip, overflow, forgery, airtime |
-| `packing.py` | bytes to symbols, framing, CRC-8 |
-| `message.py` | send and decode a real message; also a command line |
-| `selftest.py` | hardware-free proof: bin alignment, amplitude, rejection, noise sweep, timing |
-| `synctest.py` | sync comparison, message delivery, corruption, airtime |
-| `loopback.py` | raw symbol burst; kept because it documents the weekend 1 failure |
-| `play.py` | play a burst, write or read a wav |
-| `audiocheck.py` | which input devices actually capture anything |
+| `soundout/radio/tones.py` | 4-FSK encoder and the Goertzel detector |
+| `soundout/radio/preamble.py` | the chirp, the matched filter, both sync methods |
+| `soundout/radio/framing.py` | bytes to symbols, length, CRC-8 |
+| `soundout/radio/link.py` | transmit and receive a frame |
+| `soundout/radio/channel.py` | a simulated channel for testing without hardware |
+| `soundout/radio/wav.py` | wav reading and writing |
+| `soundout/island/situation.py` | the 12-byte schema and its bit packing |
+| `soundout/island/trust.py` | HMAC tags, Ed25519, key derivation |
+| `soundout/island/reports.py` | compose, authenticate, ingest |
+| `soundout/island/store.py` | the observation set and the fold |
+| `tools/` | the things a human runs |
+| `experiments/` | every measurement quoted in this journal |
+
+Reorganising also removed three copies of the same logic: composing a report lived in
+`report.py`, authenticating one lived in `receiver.py`, and the simulated channel lived in
+`loopback.py` while three experiments imported it from there. All three now sit in the
+library, and the tools are thin command lines over it. Every experiment produces
+byte-identical results to before the move, which is the only reason to believe the
+refactor changed nothing.
 
 ## Next
 

@@ -1,8 +1,8 @@
 import numpy as np
 
-from goertzel import RATE, TONES, detect, encode, symbol_length
-from packing import build_frame, bytes_to_symbols, parse_frame, symbols_to_bytes
-from preamble import chirp, find_burst, guard
+from .framing import build_frame, bytes_to_symbols, parse_frame, symbols_to_bytes
+from .preamble import chirp, find_burst, guard
+from .tones import RATE, TONES, detect, encode, symbol_length
 
 LENGTH_SYMBOLS = 4
 
@@ -71,7 +71,7 @@ def receive(signal, rate=RATE, min_psr=8.0):
 
 
 def duration_seconds(payload_length, rate=RATE):
-    from preamble import CHIRP_MS, GUARD_MS
+    from .preamble import CHIRP_MS, GUARD_MS
 
     symbols = 4 * (1 + payload_length + 1)
     return (CHIRP_MS + GUARD_MS) / 1000 + symbols * symbol_length(rate) / rate
@@ -86,7 +86,7 @@ def _send(text, wav_path, play, amplitude):
     print(f"airtime : {len(signal) / RATE:.2f} s")
 
     if wav_path:
-        from play import write_wav
+        from .wav import write_wav
         write_wav(wav_path, padded)
         print(f"wrote   : {wav_path}")
 
@@ -98,7 +98,7 @@ def _send(text, wav_path, play, amplitude):
 
 
 def _decode(wav_path):
-    from play import read_wav
+    from .wav import read_wav
 
     signal, rate = read_wav(wav_path)
     result = receive(signal, rate=rate)

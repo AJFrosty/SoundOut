@@ -1,8 +1,8 @@
 import itertools
 import random
 
-from situation import encode_report
-from store import Store
+from soundout.island.situation import encode_report
+from soundout.island.store import Store
 
 RANDOM = random.Random(5)
 

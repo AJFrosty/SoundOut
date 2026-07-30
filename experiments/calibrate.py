@@ -1,9 +1,9 @@
 import numpy as np
 
-from goertzel import RATE
-from loopback import through_simulated_channel
-from message import transmit
-from preamble import find_burst
+from soundout.radio.channel import through_simulated_channel
+from soundout.radio.link import transmit
+from soundout.radio.preamble import find_burst
+from soundout.radio.tones import RATE
 
 RNG = np.random.default_rng(31)
 PAYLOAD = b"\x00" * 16

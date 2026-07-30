@@ -1,9 +1,9 @@
 import numpy as np
 
-from goertzel import RATE
-from loopback import through_simulated_channel
-from message import receive, transmit
-from situation import (
+from soundout.radio.channel import through_simulated_channel
+from soundout.radio.link import receive, transmit
+from soundout.radio.tones import RATE
+from soundout.island.situation import (
     NEEDS,
     REPORT_BYTES,
     decode_report,
@@ -12,7 +12,14 @@ from situation import (
     field_limits,
     needs_mask,
 )
-from trust import SIGNATURE_BYTES, ShelterKeys, TAG_BYTES, Authority, forgery_odds, tag
+from soundout.island.trust import (
+    SIGNATURE_BYTES,
+    TAG_BYTES,
+    Authority,
+    ShelterKeys,
+    forgery_odds,
+    tag,
+)
 
 RNG = np.random.default_rng(23)
 

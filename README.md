@@ -4,35 +4,102 @@ Structured disaster reports carried over sound, so an island can keep a shared s
 picture when the towers and the power are down. A phone with no signal can still make a
 noise, and a handheld radio still carries it.
 
-Not a chat app. Reports are a compact binary schema, merged into one picture that
-converges no matter what order devices hear each other in.
+Not a chat app. Reports are a 12-byte binary schema, authenticated, merged into one picture
+that converges no matter what order devices hear each other in.
 
-## Status
+## Layout
 
-Weekend 1 of the build: 4-FSK modulation and Goertzel detection working and measured.
-Reliable to about −15 dB SNR in simulation. Synchronisation is the current weak point and
-the next piece of work — see `JOURNAL.md`.
-
-## Running it
+The split is the real seam in the design: **the radio half does not know what a shelter is,
+and the island half does not know what a tone is.**
 
 ```
-pip install numpy sounddevice
+soundout/radio/     getting bytes through the air
+  tones.py          4-FSK encoder, Goertzel detector
+  preamble.py       chirp, matched filter, detection statistics
+  framing.py        bytes to symbols, length, CRC-8
+  link.py           transmit and receive a frame
+  channel.py        a simulated channel, for testing without hardware
+  wav.py            read and write wav files
 
-python selftest.py                      # no hardware needed
-python loopback.py --simulate 15        # 40 symbols through a simulated channel
-python loopback.py --simulate 5 --oracle-sync
-python audiocheck.py                    # which inputs actually capture
-python loopback.py                      # the real thing, once an input works
+soundout/island/    what the bytes mean
+  situation.py      the 12-byte schema and its bit packing
+  trust.py          HMAC tags for reports, Ed25519 for authority broadcasts
+  reports.py        compose, authenticate, ingest
+  store.py          the observation set and the fold that becomes the picture
+
+tools/              things a human runs
+  report.py         compose and transmit a situation report
+  receiver.py       listen continuously, authenticate, merge
+  dashboard.py      the island picture on localhost
+  listen.py         record once and decode whatever is heard
+  airtest.py        play and record at the same time
+  loopback.py       raw symbol burst, kept because it documents the first failure
+  audiocheck.py     which input devices actually capture
+
+experiments/        the measurements behind every claim in the journal
+  selftest.py       bin alignment, amplitude, rejection, noise, timing
+  synctest.py       energy threshold against matched filter
+  calibrate.py      where the detection threshold came from
+  schematest.py     schema round trip, overflow, forgery, airtime
+  storetest.py      order independence, idempotence, tie breaks
+  demotest.py       four reports over a noisy channel into one picture
+
+docs/JOURNAL.md     the reasoning, the measurements and the failures
 ```
+
+Everything runs from the repository root with `-m`, so no installation is needed.
+
+## Try it without hardware
+
+```
+pip install numpy sounddevice cryptography
+
+python -m experiments.selftest       # the detector, measured against noise
+python -m experiments.synctest       # why the preamble replaced loudness
+python -m experiments.calibrate      # how the threshold was chosen
+python -m experiments.demotest       # four reports become one picture
+python -m experiments.storetest      # the merge properties
+```
+
+## Send something
+
+```
+python -m soundout.radio.link --text "HELLO ANTIGUA" --play
+python -m soundout.radio.link --text "TEST" --wav t.wav
+python -m soundout.radio.link --decode t.wav
+
+python -m tools.report --shelter 37 --people 42 --capacity 60 \
+                       --needs water,insulin --access impassable
+```
+
+## The live demo, three terminals
+
+```
+python -m tools.dashboard                    # http://localhost:8000
+python -m tools.receiver --device 1          # listens, authenticates, merges
+python -m tools.report --shelter 12 --people 180 --capacity 180 --needs water,food
+```
+
+`python -m tools.audiocheck` first if you are not sure which device is which.
 
 ## Parameters
 
 | | |
 |---|---|
 | sample rate | 44100 Hz |
-| symbol | 20 ms (882 samples) |
-| tones | 1000, 1200, 1400, 1600 Hz |
-| rate | 50 baud, 2 bits/symbol, 100 bps |
+| symbol | 20 ms, 4-FSK at 1000/1200/1400/1600 Hz |
+| rate | 50 baud, 2 bits per symbol, 100 bps |
+| preamble | 100 ms chirp, 800-2400 Hz |
+| frame | chirp, guard, length, payload, CRC-8 |
+| report | 12 bytes, plus a 4-byte authentication tag |
+| airtime | 1.56 s for a full authenticated report |
 
-Every tone is a whole number of bins at this window length, so nothing leaks between them.
-The reasoning behind each choice is in `JOURNAL.md`.
+## Where it stands
+
+Working and measured: symbol detection to -15 dB SNR, sample-exact synchronisation to
+-10 dB, 100% message delivery to -10 dB, zero undetected corruptions in 200 damaged
+frames, and a convergent picture across 200 random orderings. Proven on real hardware:
+a signed report played through a headset earpiece, captured by that headset's microphone,
+and decoded exactly.
+
+Not done yet: forward error correction, a handheld radio hop, and the mobility simulation.

@@ -4,7 +4,7 @@ import wave
 import numpy as np
 import sounddevice as sd
 
-from goertzel import RATE, TONES, decode, encode, symbol_length
+from .tones import RATE, TONES, decode, encode, symbol_length
 
 LEAD_IN_S = 0.4
 
