@@ -1,5 +1,9 @@
+from . import reedsolomon
+
 CRC_POLYNOMIAL = 0x07
-MAX_PAYLOAD = 255
+MAX_PAYLOAD = 200
+PARITY_BYTES = 6
+LENGTH_COPIES = 3
 
 
 def bytes_to_symbols(data):
@@ -35,32 +39,51 @@ def crc8(data):
     return remainder
 
 
-def build_frame(payload):
+def build_frame(payload, parity_bytes=PARITY_BYTES):
     if len(payload) > MAX_PAYLOAD:
         raise ValueError(f"payload is {len(payload)} bytes, limit is {MAX_PAYLOAD}")
 
-    body = bytes([len(payload)]) + bytes(payload)
-    return body + bytes([crc8(body)])
+    protected = bytes(payload) + bytes([crc8(payload)])
+    codeword = reedsolomon.encode(protected, parity_bytes)
+
+    return bytes([len(payload)]) * LENGTH_COPIES + codeword
 
 
-def parse_frame(data):
-    if len(data) < 2:
-        return None, "frame too short"
+def majority_length(copies):
+    for candidate in copies:
+        if sum(1 for other in copies if other == candidate) >= 2:
+            return candidate, None
+    return None, "the three length bytes all disagree"
 
-    length = data[0]
-    expected = 1 + length + 1
 
+def parse_frame(data, parity_bytes=PARITY_BYTES):
+    if len(data) < LENGTH_COPIES + 2:
+        return None, "frame too short", 0
+
+    length, error = majority_length(list(data[:LENGTH_COPIES]))
+    if error:
+        return None, error, 0
+
+    expected = LENGTH_COPIES + length + 1 + parity_bytes
     if len(data) < expected:
-        return None, f"truncated: need {expected} bytes, have {len(data)}"
+        return None, f"truncated: need {expected} bytes, have {len(data)}", 0
 
-    body = data[:1 + length]
-    received_crc = data[1 + length]
+    codeword = data[LENGTH_COPIES:expected]
+    repaired, corrected, error = reedsolomon.decode(codeword, parity_bytes)
 
-    if crc8(body) != received_crc:
-        return None, "crc mismatch"
+    if error:
+        return None, error, 0
 
-    return bytes(body[1:]), None
+    payload = repaired[:-1]
+    if crc8(payload) != repaired[-1]:
+        return None, "crc mismatch after correction", corrected
+
+    return bytes(payload), None, corrected
 
 
-def frame_symbol_count(payload_length):
-    return 4 * (1 + payload_length + 1)
+def frame_byte_count(payload_length, parity_bytes=PARITY_BYTES):
+    return LENGTH_COPIES + payload_length + 1 + parity_bytes
+
+
+def frame_symbol_count(payload_length, parity_bytes=PARITY_BYTES):
+    return 4 * frame_byte_count(payload_length, parity_bytes)

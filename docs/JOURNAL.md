@@ -474,6 +474,115 @@ every two seconds.
 
 ---
 
+## Weekend 5 — repairing damage instead of discarding it
+
+**Goal:** the CRC could only ever say "this is broken". Reed-Solomon repairs a few wrong
+bytes so the frame survives, which is what buys range on a worse channel.
+
+### Why Reed-Solomon over GF(256) suits this channel exactly
+
+Four symbols make one byte. A misread tone therefore damages **exactly one byte**, however
+many of its bits are wrong. Reed-Solomon corrects *byte* errors wherever they fall, so the
+code and the channel line up without any cleverness: t bad tones cost t bad bytes, and
+2t parity bytes repair them.
+
+It also handles bursts for free. A squelch click that wipes three consecutive symbols
+damages three consecutive bytes, and the decoder does not care whether errors are spread
+out or adjacent.
+
+### Built and checked in stages
+
+The field first, because everything stands on it and a broken field fails in ways that
+look like decoder bugs. GF(256) was verified to actually be a field: closure, identity,
+an inverse for every nonzero element, commutativity, associativity, distributivity, and
+division undoing multiplication.
+
+Then encoding, then decoding, measured at each step:
+
+| bytes damaged | recovered | detected as too damaged | wrong answer |
+|---|---|---|---|
+| 0 | 100% | 0% | 0% |
+| 1 | 100% | 0% | 0% |
+| 2 | 100% | 0% | 0% |
+| 3 (the limit) | 100% | 0% | 0% |
+| 4 | 0% | 100% | 0% |
+| 5 | 0% | 100% | 0% |
+
+Exactly the theoretical behaviour: six parity bytes correct three errors, and beyond that
+it refuses rather than guessing. Consecutive damage behaves identically, as expected.
+
+### The bug that produced a plausible-looking wrong answer
+
+The first run corrected nothing at all — every single-byte error came back as "too
+damaged". The field tests all passed, which localised it immediately: the fault had to be
+in the error locator, not the arithmetic.
+
+Feeding one known error through by hand gave a locator of `[76, 0]`. A valid error locator
+must satisfy Λ(0) = 1, so a zero constant term is impossible — the polynomial was
+malformed rather than merely wrong. Two mistakes in Berlekamp-Massey:
+
+1. the discrepancy was computed *after* shifting the previous polynomial rather than
+   before, so it used the wrong syndrome alignment;
+2. the update step was skipped in the branch where the polynomials swap.
+
+Both are single lines. With them fixed the locator became `[76, 1]`, the Chien search
+found position 5, and it has corrected everything within its limit since.
+
+Worth noting what did *not* happen: it never produced a wrong answer, even while broken.
+It failed closed.
+
+### The experiment that measured nothing
+
+The first attempt at "does FEC help" varied the parity level by reassigning
+`framing.PARITY_BYTES` between runs. The output looked believable — three columns, small
+differences — until the airtime column read **2.20 s for every configuration**. Adding
+parity bytes must add airtime, so the numbers could not be real.
+
+The cause is that `def build_frame(payload, parity_bytes=PARITY_BYTES)` binds its default
+**when the function is defined**, not when it is called. Reassigning the module attribute
+afterwards changes nothing. All three columns had run the identical configuration and the
+differences were random noise.
+
+Parity is now a parameter threaded through `transmit` and `receive`. The lesson is that
+the airtime column was doing real work as a control: a number that *must* change if the
+experiment is valid, sitting next to the numbers being measured.
+
+### What the protection actually buys
+
+Delivery of a 16-byte authenticated report, 40 trials per level:
+
+| SNR | crc only | +6 parity | +10 parity |
+|---|---|---|---|
+| −13 dB | 98% | 100% | 100% |
+| −15 dB | 90% | **100%** | **100%** |
+| −16 dB | 57% | **95%** | **100%** |
+| −17 dB | 5% | **62%** | **92%** |
+| −18 dB | 0% | 32% | 30% |
+
+Six parity bytes move the usable floor down by roughly 2 dB and cost 0.48 s, taking a full
+report from 1.72 s to 2.20 s. At −17 dB that is the difference between one report in
+twenty arriving and three in five.
+
+Ten parity bytes buy roughly another 1 dB for a further 0.32 s. Six is the better trade on
+a shared channel, where airtime is the scarce resource — but the level is now a parameter,
+so a station on a bad link can spend more.
+
+### The layering, deliberately
+
+Reed-Solomon can *miscorrect*: given more errors than it can handle it may land on a
+different valid codeword and hand back confident nonsense. That is exactly why the CRC
+stays underneath it. Two hundred frames at −18 dB, where a third of frames need repair:
+**zero accepted-but-wrong**. Reed-Solomon repairs, the CRC has the final say.
+
+### One thing the frame needed first
+
+The receiver reads the length byte to know how many symbols to collect — so a corrupted
+length byte breaks decoding before Reed-Solomon can help. The length is now sent three
+times and resolved by majority vote, at a cost of 0.16 s. Protection has to start with the
+field that tells you how much there is to protect.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -483,7 +592,8 @@ the island half does not know what a tone is.
 |---|---|
 | `soundout/radio/tones.py` | 4-FSK encoder and the Goertzel detector |
 | `soundout/radio/preamble.py` | the chirp, the matched filter, both sync methods |
-| `soundout/radio/framing.py` | bytes to symbols, length, CRC-8 |
+| `soundout/radio/framing.py` | bytes to symbols, triple length, CRC-8, Reed-Solomon wrapping |
+| `soundout/radio/reedsolomon.py` | GF(256) arithmetic and the Reed-Solomon codec |
 | `soundout/radio/link.py` | transmit and receive a frame |
 | `soundout/radio/channel.py` | a simulated channel for testing without hardware |
 | `soundout/radio/wav.py` | wav reading and writing |
@@ -511,6 +621,6 @@ refactor changed nothing.
 - [x] Authentication: HMAC tags for reports, Ed25519 for authority broadcasts
 - [x] Convergent store and the island picture
 - [x] Live receiver and dashboard
-- [ ] Forward error correction, to repair the frames the CRC currently rejects
+- [x] Forward error correction, worth about 2 dB for 0.48 s
 - [ ] Over a handheld radio, and across a room at distance
 - [ ] The mobility simulator and the comparison chart

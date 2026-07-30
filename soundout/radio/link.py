@@ -1,17 +1,25 @@
 import numpy as np
 
-from .framing import build_frame, bytes_to_symbols, parse_frame, symbols_to_bytes
+from .framing import (
+    LENGTH_COPIES,
+    PARITY_BYTES,
+    build_frame,
+    bytes_to_symbols,
+    frame_byte_count,
+    parse_frame,
+    symbols_to_bytes,
+)
 from .preamble import chirp, find_burst, guard
 from .tones import RATE, TONES, detect, encode, symbol_length
 
-LENGTH_SYMBOLS = 4
+LENGTH_SYMBOLS = 4 * LENGTH_COPIES
 
 
-def transmit(payload, rate=RATE, amplitude=0.5):
+def transmit(payload, rate=RATE, amplitude=0.5, parity_bytes=PARITY_BYTES):
     if isinstance(payload, str):
         payload = payload.encode("utf-8")
 
-    frame = build_frame(payload)
+    frame = build_frame(payload, parity_bytes)
     symbols = bytes_to_symbols(frame)
 
     return np.concatenate([
@@ -37,7 +45,7 @@ def read_symbols(signal, start, count, rate=RATE):
     return symbols, margins
 
 
-def receive(signal, rate=RATE, min_psr=8.0):
+def receive(signal, rate=RATE, min_psr=8.0, parity_bytes=PARITY_BYTES):
     burst = find_burst(signal, rate=rate, min_psr=min_psr)
 
     if not burst["found"]:
@@ -47,15 +55,20 @@ def receive(signal, rate=RATE, min_psr=8.0):
     if len(header) < LENGTH_SYMBOLS:
         return {"ok": False, "error": "signal ended before the length byte", "burst": burst}
 
-    length = symbols_to_bytes(header)[0]
-    total = 4 * (1 + length + 1)
+    from .framing import majority_length
+
+    length, error = majority_length(list(symbols_to_bytes(header)))
+    if error:
+        return {"ok": False, "error": error, "burst": burst}
+
+    total = 4 * frame_byte_count(length, parity_bytes)
 
     symbols, margins = read_symbols(signal, burst["data_start"], total, rate)
     if len(symbols) < total:
         return {"ok": False, "error": "signal ended mid-frame", "burst": burst,
                 "length": length}
 
-    payload, error = parse_frame(symbols_to_bytes(symbols))
+    payload, error, corrected = parse_frame(symbols_to_bytes(symbols), parity_bytes)
 
     if error:
         return {"ok": False, "error": error, "burst": burst, "length": length,
@@ -66,6 +79,7 @@ def receive(signal, rate=RATE, min_psr=8.0):
         "payload": payload,
         "text": payload.decode("utf-8", errors="replace"),
         "burst": burst,
+        "corrected": corrected,
         "median_margin": float(np.median(margins)),
     }
 
@@ -109,6 +123,8 @@ def _decode(wav_path):
 
     if result["ok"]:
         print(f"decoded   : \"{result['text']}\"")
+        repaired = result.get("corrected", 0)
+        print(f"repaired  : {repaired} damaged byte{'' if repaired == 1 else 's'}")
         print(f"margin    : {result['median_margin']:.1f}x")
     else:
         print(f"failed    : {result['error']}")
