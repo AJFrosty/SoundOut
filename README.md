@@ -136,6 +136,23 @@ path, delivers it through a noisy channel, lists your audio devices, and flags a
 files left over from an older frame format. Audio recorded before a format change cannot
 decode and has to be regenerated — the check names those files.
 
+## Reaching further
+
+Slower modes integrate for longer and so hear a weaker signal. The receiver is not told
+which was used - it finds the preamble, then tries each mode until one passes.
+
+```
+python -m tools.report --shelter 37 --people 42 --mode farthest
+python -m experiments.rangegain      # what each mode buys
+python -m experiments.response       # where your speaker is actually loudest
+```
+
+| mode | rate | airtime | works down to | range |
+|---|---|---|---|---|
+| fast | 100 bps | 2.3 s | -16 dB | 1.0x |
+| far | 50 bps | 4.5 s | -19 dB | 1.4x |
+| farthest | 25 bps | 9.1 s | -21 dB | 1.8x |
+
 ## Parameters
 
 | | |

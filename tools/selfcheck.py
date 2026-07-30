@@ -14,7 +14,8 @@ import numpy as np
 MODULES = [
     "soundout.radio.tones", "soundout.radio.preamble", "soundout.radio.framing",
     "soundout.radio.reedsolomon", "soundout.radio.link", "soundout.radio.channel",
-    "soundout.radio.wav", "soundout.island.situation", "soundout.island.trust",
+    "soundout.radio.wav", "soundout.radio.devices",
+    "soundout.island.situation", "soundout.island.trust",
     "soundout.island.reports", "soundout.island.store", "soundout.island.validate",
     "tools.report", "tools.receiver", "tools.listen", "tools.dashboard",
     "tools.airtest", "tools.loopback", "tools.audiocheck",

@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--amplitude", type=float, default=0.7)
     parser.add_argument("--wav", type=str, default=None)
     parser.add_argument("--out-device", type=int, default=None)
+    parser.add_argument("--mode", type=str, default="fast",
+                        help="fast, far or farthest - slower reaches further")
     parser.add_argument("--quiet", action="store_true", help="do not play, just build")
     args = parser.parse_args()
 
@@ -48,11 +50,12 @@ def main():
     payload = build_report(reporter, shelter, people, capacity,
                            needs, casualties, access)
 
-    signal = transmit(payload, amplitude=amplitude)
+    signal = transmit(payload, amplitude=amplitude, mode=args.mode)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
 
     print(f"report  : {describe(payload[:12])}")
     print(f"payload : {len(payload)} bytes ({payload.hex()})")
+    print(f"mode    : {args.mode}")
     print(f"airtime : {len(signal) / RATE:.2f} s")
 
     if args.wav:

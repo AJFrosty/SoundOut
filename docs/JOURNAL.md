@@ -583,6 +583,103 @@ field that tells you how much there is to protect.
 
 ---
 
+## Weekend 6 - reaching further without buying anything
+
+**Goal:** the acoustic range was a couple of metres. Find the free decibels.
+
+### Slowing down is the lever
+
+Range is set by the signal-to-noise ratio at the detector, and the detector's gain comes
+from how long it integrates. Doubling the symbol length doubles the window: **+3 dB**.
+Sound falls about 6 dB each time the distance doubles, so +6 dB is roughly twice the range.
+
+Three modes, chosen so the existing tones stay exactly on bin centres at every symbol
+length (1000, 1200, 1400 and 1600 Hz are whole multiples of 12.5 Hz, the bin spacing at
+80 ms):
+
+| mode | symbol | rate | preamble |
+|---|---|---|---|
+| fast | 20 ms | 100 bps | 100 ms |
+| far | 40 ms | 50 bps | 200 ms |
+| farthest | 80 ms | 25 bps | 400 ms |
+
+**The receiver is not told which mode was used.** The preamble is found first, then each
+mode is tried until one produces a frame that passes Reed-Solomon and the CRC. A station
+can therefore switch to a slower mode without anyone reconfiguring the base.
+
+### The first attempt only bought 1 dB, and the reason was the interesting part
+
+Lengthening the symbols alone gave +1 dB and +2 dB, not the predicted +3 and +6. Rather
+than accept it, the two failure paths were separated - how often the preamble was found,
+against how often the data decoded once it had been:
+
+| SNR | mode | preamble found | decoded when found |
+|---|---|---|---|
+| -18 dB | fast | 90% | 22% |
+| -18 dB | farthest | 78% | 97% |
+| -20 dB | fast | 48% | 0% |
+| -20 dB | farthest | 45% | **100%** |
+
+The long modes had made the data almost indestructible and turned the fixed 100 ms chirp
+into the ceiling. At -20 dB the payload decoded every single time it was heard at all; the
+system was failing entirely at the front door.
+
+**The bottleneck had moved, and the fix had to move with it.** A matched filter gains the
+same way a symbol detector does, so the preamble now scales with the mode: 100, 200 and
+400 ms. With both scaled together:
+
+| SNR | fast | far | farthest |
+|---|---|---|---|
+| -16 dB | 92% | 100% | 100% |
+| -18 dB | 8% | 100% | 100% |
+| -20 dB | 0% | 60% | 100% |
+| -22 dB | 0% | 0% | **96%** |
+
+| mode | airtime | works down to | gain | range |
+|---|---|---|---|---|
+| fast | 2.28 s | -16 dB | - | 1.0x |
+| far | 4.54 s | -19 dB | +3 dB | 1.4x |
+| farthest | 9.06 s | -21 dB | +5 dB | 1.8x |
+
+Measured +3 and +5 dB against a predicted +3 and +6. In a shelter, nobody minds whether
+the beep lasts two seconds or nine.
+
+### A false decode, found by accident
+
+While testing mode detection, an 80 ms transmission decoded successfully *as* a 20 ms one.
+Reading long tones in short windows repeats each symbol four times, which turned the three
+length bytes into `00 55 00` - majority vote gave a length of **zero**, and Reed-Solomon,
+with six parity bytes guarding a single data byte, cheerfully corrected the garbage into a
+valid empty codeword whose CRC also passed.
+
+This is exactly the miscorrection the CRC was supposed to catch, happening because a
+7-byte codeword with 6 parity bytes leaves the decoder far too much freedom. Two fixes:
+
+- a **frame carrying nothing is rejected outright**, since it is never legitimate;
+- a **format version byte** now rides inside the protected region, so a false decode must
+  also land on the right version. With the CRC that is roughly one in 65,000 rather than
+  one in 256.
+
+The version byte pays a second dividend. Audio recorded before a format change now fails
+with something a person can act on rather than a puzzle, which matters because every
+change to the frame silently invalidates every wav file already recorded - something that
+had already caused an hour of confusion once.
+
+### Free decibels still on the table
+
+Tones sit at 1000-1600 Hz, but small phone and laptop speakers usually move far more air
+around 2-3 kHz. `experiments/response.py` sweeps 400-3600 Hz through the actual speaker
+and microphone, measures what comes back, and recommends the best four tones 200 Hz apart
+that stay bin-aligned in every mode. If the answer is more than 1.5 dB better than the
+current set it says so; if not it says to leave them alone. Not run yet - it needs the
+hardware.
+
+Also free, and not yet measured: turning off the microphone's noise suppression and
+automatic gain, which are tuned for speech and fight steady tones; resting the phone on a
+hard surface as a soundboard; and cupping something around the speaker to aim it.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -596,6 +693,7 @@ the island half does not know what a tone is.
 | `soundout/radio/reedsolomon.py` | GF(256) arithmetic and the Reed-Solomon codec |
 | `soundout/radio/link.py` | transmit and receive a frame |
 | `soundout/radio/channel.py` | a simulated channel for testing without hardware |
+| `soundout/radio/devices.py` | finding an input and output on the same host API |
 | `soundout/radio/wav.py` | wav reading and writing |
 | `soundout/island/situation.py` | the 12-byte schema and its bit packing |
 | `soundout/island/trust.py` | HMAC tags, Ed25519, key derivation |
@@ -616,6 +714,8 @@ refactor changed nothing.
 - [x] Preamble + cross-correlation sync, replacing the energy threshold
 - [x] Packet framing with a length field and a CRC
 - [x] Real hardware: speaker to microphone, decoded exactly
+- [x] Long-range modes, worth 5 dB and roughly double the distance
+- [ ] Measure the speaker and microphone response, move the tones if it pays
 - [ ] Across a room, then over a radio
 - [x] The 12-byte situation schema, replacing free text
 - [x] Authentication: HMAC tags for reports, Ed25519 for authority broadcasts

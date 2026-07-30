@@ -4,6 +4,7 @@ CRC_POLYNOMIAL = 0x07
 MAX_PAYLOAD = 200
 PARITY_BYTES = 6
 LENGTH_COPIES = 3
+FORMAT_VERSION = 2
 
 
 def bytes_to_symbols(data):
@@ -43,7 +44,11 @@ def build_frame(payload, parity_bytes=PARITY_BYTES):
     if len(payload) > MAX_PAYLOAD:
         raise ValueError(f"payload is {len(payload)} bytes, limit is {MAX_PAYLOAD}")
 
-    protected = bytes(payload) + bytes([crc8(payload)])
+    if len(payload) == 0:
+        raise ValueError("there is nothing to send")
+
+    body = bytes([FORMAT_VERSION]) + bytes(payload)
+    protected = body + bytes([crc8(body)])
     codeword = reedsolomon.encode(protected, parity_bytes)
 
     return bytes([len(payload)]) * LENGTH_COPIES + codeword
@@ -64,7 +69,10 @@ def parse_frame(data, parity_bytes=PARITY_BYTES):
     if error:
         return None, error, 0
 
-    expected = LENGTH_COPIES + length + 1 + parity_bytes
+    if length == 0:
+        return None, "a frame carrying nothing is not a real frame", 0
+
+    expected = LENGTH_COPIES + 1 + length + 1 + parity_bytes
     if len(data) < expected:
         return None, f"truncated: need {expected} bytes, have {len(data)}", 0
 
@@ -74,15 +82,19 @@ def parse_frame(data, parity_bytes=PARITY_BYTES):
     if error:
         return None, error, 0
 
-    payload = repaired[:-1]
-    if crc8(payload) != repaired[-1]:
+    body = repaired[:-1]
+    if crc8(body) != repaired[-1]:
         return None, "crc mismatch after correction", corrected
 
-    return bytes(payload), None, corrected
+    if body[0] != FORMAT_VERSION:
+        return None, (f"this is frame format v{body[0]}, "
+                      f"and this build speaks v{FORMAT_VERSION}"), corrected
+
+    return bytes(body[1:]), None, corrected
 
 
 def frame_byte_count(payload_length, parity_bytes=PARITY_BYTES):
-    return LENGTH_COPIES + payload_length + 1 + parity_bytes
+    return LENGTH_COPIES + 1 + payload_length + 1 + parity_bytes
 
 
 def frame_symbol_count(payload_length, parity_bytes=PARITY_BYTES):

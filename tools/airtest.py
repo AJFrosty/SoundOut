@@ -9,6 +9,7 @@ import argparse
 import numpy as np
 import sounddevice as sd
 
+from soundout.radio.devices import same_api_pair
 from soundout.island.reports import build_report
 from soundout.island.situation import REPORT_BYTES, describe
 from soundout.radio.link import receive, transmit
@@ -20,26 +21,6 @@ REPORT = dict(
     needs=["water", "insulin"], casualties=2, access="impassable", minutes=1_234_567,
 )
 
-
-def same_api_pair(preferred_output="speakers"):
-    devices = sd.query_devices()
-    apis = sd.query_hostapis()
-
-    best = None
-    for i, d in enumerate(devices):
-        if d["max_input_channels"] < 1:
-            continue
-        for j, o in enumerate(devices):
-            if o["max_output_channels"] < 1 or o["hostapi"] != d["hostapi"]:
-                continue
-            score = (preferred_output in o["name"].lower(), apis[d["hostapi"]]["name"] == "MME")
-            if best is None or score > best[0]:
-                best = (score, i, j)
-
-    if best is None:
-        raise SystemExit("no input and output on the same host API")
-
-    return best[1], best[2]
 
 
 def run(payload, in_device, out_device, amplitude, lead_s=0.5, tail_s=0.8):

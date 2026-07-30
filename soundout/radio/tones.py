@@ -4,6 +4,36 @@ RATE = 44100
 SYMBOL_MS = 20
 TONES = [1000, 1200, 1400, 1600]
 
+MODES = {
+    "fast": {"symbol_ms": 20, "chirp_ms": 100},
+    "far": {"symbol_ms": 40, "chirp_ms": 200},
+    "farthest": {"symbol_ms": 80, "chirp_ms": 400},
+}
+
+
+def mode_settings(mode):
+    if mode not in MODES:
+        raise ValueError(f"unknown mode {mode!r}; choose from: {', '.join(MODES)}")
+    return MODES[mode]
+
+
+def bin_spacing(rate=RATE, symbol_ms=SYMBOL_MS):
+    return rate / symbol_length(rate, symbol_ms)
+
+
+def is_aligned(tones, rate=RATE, symbol_ms=SYMBOL_MS):
+    spacing = bin_spacing(rate, symbol_ms)
+    return all(abs(f / spacing - round(f / spacing)) < 1e-9 for f in tones)
+
+
+def align(tones, rate=RATE, symbol_ms=SYMBOL_MS):
+    spacing = bin_spacing(rate, symbol_ms)
+    return [round(round(f / spacing) * spacing) for f in tones]
+
+
+def rate_bps(symbol_ms=SYMBOL_MS):
+    return 2 * 1000 / symbol_ms
+
 
 def symbol_length(rate=RATE, symbol_ms=SYMBOL_MS):
     return int(rate * symbol_ms / 1000)

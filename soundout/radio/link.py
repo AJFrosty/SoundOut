@@ -10,27 +10,38 @@ from .framing import (
     symbols_to_bytes,
 )
 from .preamble import chirp, find_burst, guard
-from .tones import RATE, TONES, detect, encode, symbol_length
+from .tones import (
+    MODES,
+    RATE,
+    SYMBOL_MS,
+    TONES,
+    detect,
+    encode,
+    mode_settings,
+    symbol_length,
+)
 
 LENGTH_SYMBOLS = 4 * LENGTH_COPIES
 
 
-def transmit(payload, rate=RATE, amplitude=0.5, parity_bytes=PARITY_BYTES):
+def transmit(payload, rate=RATE, amplitude=0.5, parity_bytes=PARITY_BYTES,
+             mode="fast", tones=TONES):
     if isinstance(payload, str):
         payload = payload.encode("utf-8")
 
+    settings = mode_settings(mode)
     frame = build_frame(payload, parity_bytes)
     symbols = bytes_to_symbols(frame)
 
     return np.concatenate([
-        chirp(rate, amplitude=amplitude),
+        chirp(rate, settings["chirp_ms"], amplitude=amplitude),
         guard(rate),
-        encode(symbols, amplitude=amplitude),
+        encode(symbols, tones, rate, settings["symbol_ms"], amplitude),
     ])
 
 
-def read_symbols(signal, start, count, rate=RATE):
-    n = symbol_length(rate)
+def read_symbols(signal, start, count, rate=RATE, symbol_ms=SYMBOL_MS, tones=TONES):
+    n = symbol_length(rate, symbol_ms)
     symbols = []
     margins = []
 
@@ -38,65 +49,93 @@ def read_symbols(signal, start, count, rate=RATE):
         window = signal[start + i * n:start + (i + 1) * n]
         if len(window) < n:
             break
-        found, _, margin = detect(window, TONES, rate)
-        symbols.append(TONES.index(found))
+        found, _, margin = detect(window, tones, rate)
+        symbols.append(tones.index(found))
         margins.append(margin)
 
     return symbols, margins
 
 
-def receive(signal, rate=RATE, min_psr=8.0, parity_bytes=PARITY_BYTES):
-    burst = find_burst(signal, rate=rate, min_psr=min_psr)
-
-    if not burst["found"]:
-        return {"ok": False, "error": "no preamble found", "burst": burst}
-
-    header, _ = read_symbols(signal, burst["data_start"], LENGTH_SYMBOLS, rate)
+def decode_at(signal, burst, rate, parity_bytes, symbol_ms, tones):
+    header, _ = read_symbols(signal, burst["data_start"], LENGTH_SYMBOLS,
+                             rate, symbol_ms, tones)
     if len(header) < LENGTH_SYMBOLS:
-        return {"ok": False, "error": "signal ended before the length byte", "burst": burst}
+        return {"ok": False, "error": "signal ended before the length byte"}
 
     from .framing import majority_length
 
     length, error = majority_length(list(symbols_to_bytes(header)))
     if error:
-        return {"ok": False, "error": error, "burst": burst}
+        return {"ok": False, "error": error}
 
     total = 4 * frame_byte_count(length, parity_bytes)
-
-    symbols, margins = read_symbols(signal, burst["data_start"], total, rate)
+    symbols, margins = read_symbols(signal, burst["data_start"], total,
+                                    rate, symbol_ms, tones)
     if len(symbols) < total:
-        return {"ok": False, "error": "signal ended mid-frame", "burst": burst,
-                "length": length}
+        return {"ok": False, "error": "signal ended mid-frame", "length": length}
 
     payload, error, corrected = parse_frame(symbols_to_bytes(symbols), parity_bytes)
 
     if error:
-        return {"ok": False, "error": error, "burst": burst, "length": length,
+        return {"ok": False, "error": error, "length": length,
                 "median_margin": float(np.median(margins))}
 
     return {
         "ok": True,
         "payload": payload,
         "text": payload.decode("utf-8", errors="replace"),
-        "burst": burst,
         "corrected": corrected,
         "median_margin": float(np.median(margins)),
     }
 
 
-def duration_seconds(payload_length, rate=RATE):
-    from .preamble import CHIRP_MS, GUARD_MS
+def receive(signal, rate=RATE, min_psr=8.0, parity_bytes=PARITY_BYTES,
+            mode=None, tones=TONES):
+    attempts = [(mode, mode_settings(mode))] if mode else list(MODES.items())
+    best = None
 
-    symbols = 4 * (1 + payload_length + 1)
-    return (CHIRP_MS + GUARD_MS) / 1000 + symbols * symbol_length(rate) / rate
+    for name, settings in attempts:
+        template = chirp(rate, settings["chirp_ms"])
+        burst = find_burst(signal, template=template, rate=rate, min_psr=min_psr)
+
+        if not burst["found"]:
+            if best is None:
+                best = {"ok": False, "error": "no preamble found",
+                        "burst": burst, "mode": name}
+            continue
+
+        outcome = decode_at(signal, burst, rate, parity_bytes,
+                            settings["symbol_ms"], tones)
+        outcome["burst"] = burst
+        outcome["mode"] = name
+        outcome["symbol_ms"] = settings["symbol_ms"]
+
+        if outcome["ok"]:
+            return outcome
+
+        if best is None or not best["burst"]["found"]:
+            best = outcome
+
+    return best
 
 
-def _send(text, wav_path, play, amplitude):
-    signal = transmit(text, amplitude=amplitude)
+def duration_seconds(payload_length, rate=RATE, mode="fast"):
+    from .preamble import GUARD_MS
+
+    settings = mode_settings(mode)
+    symbols = 4 * frame_byte_count(payload_length)
+
+    return ((settings["chirp_ms"] + GUARD_MS) / 1000
+            + symbols * symbol_length(rate, settings["symbol_ms"]) / rate)
+
+
+def _send(text, wav_path, play, amplitude, mode="fast"):
+    signal = transmit(text, amplitude=amplitude, mode=mode)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
 
     print(f"message : \"{text}\"")
     print(f"bytes   : {len(text.encode('utf-8'))}")
+    print(f"mode    : {mode}")
     print(f"airtime : {len(signal) / RATE:.2f} s")
 
     if wav_path:
@@ -122,6 +161,7 @@ def _decode(wav_path):
           f"(PSR {result['burst']['psr']:.1f}, match {result['burst']['match']:.3f})")
 
     if result["ok"]:
+        print(f"mode      : {result['mode']} ({result['symbol_ms']} ms symbols)")
         print(f"decoded   : \"{result['text']}\"")
         repaired = result.get("corrected", 0)
         print(f"repaired  : {repaired} damaged byte{'' if repaired == 1 else 's'}")
@@ -138,6 +178,8 @@ if __name__ == "__main__":
     parser.add_argument("--wav", type=str, default=None)
     parser.add_argument("--play", action="store_true")
     parser.add_argument("--amplitude", type=float, default=0.4)
+    parser.add_argument("--mode", type=str, default="fast", choices=list(MODES),
+                        help="slower modes reach further")
     parser.add_argument("--decode", type=str, default=None,
                         help="decode a wav file instead of sending")
     args = parser.parse_args()
@@ -156,4 +198,4 @@ if __name__ == "__main__":
             amplitude = validate.fraction(args.amplitude, "amplitude", 0.05, 1.0)
         except validate.Invalid as error:
             raise SystemExit(f"error: {error}")
-        _send(args.text, args.wav, args.play, amplitude)
+        _send(args.text, args.wav, args.play, amplitude, args.mode)
