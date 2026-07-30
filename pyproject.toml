@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soundout"
+version = "0.5.0"
+description = "Structured disaster reports carried over sound, for when the towers and the power are down"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["disaster", "radio", "modem", "caribbean", "emergency", "fsk"]
+
+dependencies = [
+    "numpy>=1.24",
+    "sounddevice>=0.4.6",
+    "cryptography>=41.0",
+]
+
+[project.urls]
+Source = "https://github.com/AJFrosty/SoundOut"
+
+[project.scripts]
+soundout-report = "tools.report:main"
+soundout-receiver = "tools.receiver:main"
+soundout-listen = "tools.listen:main"
+soundout-selfcheck = "tools.selfcheck:main"
+
+[tool.setuptools]
+packages = ["soundout", "soundout.radio", "soundout.island", "tools", "experiments"]

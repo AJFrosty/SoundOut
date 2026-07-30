@@ -1,0 +1,16 @@
+# Everything the Python side needs:  pip install -r requirements.txt
+#
+# The reporting end needs none of this. field.html is plain HTML and JavaScript
+# with no libraries, so a phone opening it needs nothing installed at all.
+
+numpy>=1.24            # the maths: tones, correlation, buffers
+sounddevice>=0.4.6     # playing and recording audio (wraps PortAudio)
+cryptography>=41.0     # Ed25519 for authority broadcasts
+
+# Not listed because Python already ships them, and this project leans on that
+# deliberately — a tool for the hour after a hurricane should install cleanly on
+# a laptop with a bad connection:
+#
+#   sqlite3      the observation store        hashlib, hmac   report tags
+#   wave         reading and writing wavs     http.server     the dashboard
+#   argparse     every command line           queue, json     capture, state

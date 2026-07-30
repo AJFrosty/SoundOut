@@ -71,10 +71,31 @@ key derivation, tag, CRC and Reed-Solomon parity all match byte for byte.
 That is the point of the project in one file: the person reporting needs a phone and
 nothing else — no app store, no licence, no training, no signal.
 
+## Installing
+
+```
+pip install -r requirements.txt
+```
+
+Three packages: numpy, sounddevice and cryptography. Everything else comes from Python's
+standard library, deliberately — a tool meant for the hour after a hurricane should install
+cleanly on a laptop with a poor connection.
+
+On Linux, sounddevice needs PortAudio present: `sudo apt install libportaudio2`.
+
+Optionally install the project itself, which adds `soundout-report`, `soundout-receiver`,
+`soundout-listen` and `soundout-selfcheck` to your path:
+
+```
+pip install -e .
+```
+
+Neither is needed for `field.html`. That is plain HTML and JavaScript with no libraries, so
+the phone doing the reporting installs nothing at all.
+
 ## Try it without hardware
 
 ```
-pip install numpy sounddevice cryptography
 
 python -m experiments.selftest       # the detector, measured against noise
 python -m experiments.synctest       # why the preamble replaced loudness

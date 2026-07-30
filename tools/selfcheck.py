@@ -165,12 +165,36 @@ def check_audio_devices():
     return bool(inputs and outputs)
 
 
-if __name__ == "__main__":
+def check_dependencies():
+    print("dependencies")
+    healthy = True
+
+    for name, why in (("numpy", "the maths"),
+                      ("sounddevice", "playing and recording audio"),
+                      ("cryptography", "Ed25519 for authority broadcasts")):
+        try:
+            module = importlib.import_module(name)
+            healthy = line(PASS, name, getattr(module, "__version__", "")) and healthy
+        except Exception:
+            healthy = line(FAIL, name, f"missing — needed for {why}") and healthy
+
+    if not healthy:
+        print("\n  install everything with:  pip install -r requirements.txt")
+
+    return healthy
+
+
+def main():
     parser = argparse.ArgumentParser(description="is everything wired up correctly?")
     parser.add_argument("--skip-audio", action="store_true")
     args = parser.parse_args()
 
     print("SoundOut self check\n")
+
+    if not check_dependencies():
+        raise SystemExit(1)
+
+    print()
     results = [check_imports(), check_pipeline(), check_noise(), check_stale_audio()]
 
     if not args.skip_audio:
@@ -182,3 +206,7 @@ if __name__ == "__main__":
     else:
         print("something is wrong — see the FAIL lines above.")
         raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
