@@ -1,3 +1,9 @@
+import sys as _sys
+from pathlib import Path as _Path
+
+if __package__ in (None, ""):
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import argparse
 import numpy as np
 
@@ -5,6 +11,7 @@ from soundout.radio.link import transmit
 from soundout.radio.tones import RATE
 from soundout.island.reports import build_report
 from soundout.island.situation import NEEDS, describe
+from soundout.island import validate
 
 def main():
     parser = argparse.ArgumentParser(description="compose and transmit a situation report")
@@ -22,11 +29,26 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="do not play, just build")
     args = parser.parse_args()
 
-    needs = [n.strip() for n in args.needs.split(",") if n.strip()]
-    payload = build_report(args.reporter, args.shelter, args.people, args.capacity,
-                           needs, args.casualties, args.access)
+    try:
+        reporter = validate.field(args.reporter, "reporter")
+        shelter = validate.field(args.shelter, "shelter")
+        people = validate.field(args.people, "occupancy")
+        capacity = validate.field(args.capacity, "capacity")
+        casualties = validate.field(args.casualties, "casualties")
+        needs = validate.needs(args.needs)
+        access = validate.access(args.access)
+        amplitude = validate.fraction(args.amplitude, "amplitude", 0.05, 1.0)
+        out_device = validate.audio_device(args.out_device, "output")
+    except validate.Invalid as error:
+        raise SystemExit(f"error: {error}")
 
-    signal = transmit(payload, amplitude=args.amplitude)
+    if capacity and people > capacity * 4:
+        print(f"warning: {people} people in {capacity} places looks like a typo")
+
+    payload = build_report(reporter, shelter, people, capacity,
+                           needs, casualties, access)
+
+    signal = transmit(payload, amplitude=amplitude)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
 
     print(f"report  : {describe(payload[:12])}")
@@ -41,7 +63,7 @@ def main():
     if not args.quiet:
         import sounddevice as sd
         print("transmitting…")
-        sd.play(padded, RATE, device=args.out_device, blocking=True)
+        sd.play(padded, RATE, device=out_device, blocking=True)
         print("sent")
 
 

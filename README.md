@@ -49,7 +49,12 @@ experiments/        the measurements behind every claim in the journal
 docs/JOURNAL.md     the reasoning, the measurements and the failures
 ```
 
-Everything runs from the repository root with `-m`, so no installation is needed.
+Nothing needs installing. Every tool works either way:
+
+```
+python -m tools.report --shelter 37 --people 42     # from the repository root
+cd tools && python report.py --shelter 37 --people 42   # or from inside the folder
+```
 
 ## The field device is a web page
 

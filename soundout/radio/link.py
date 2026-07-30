@@ -142,7 +142,18 @@ if __name__ == "__main__":
                         help="decode a wav file instead of sending")
     args = parser.parse_args()
 
+    from ..island import validate
+    from .framing import MAX_PAYLOAD
+
     if args.decode:
+        import os
+        if not os.path.exists(args.decode):
+            raise SystemExit(f"error: no such file: {args.decode}")
         _decode(args.decode)
     else:
-        _send(args.text, args.wav, args.play, args.amplitude)
+        try:
+            validate.text_payload(args.text, MAX_PAYLOAD)
+            amplitude = validate.fraction(args.amplitude, "amplitude", 0.05, 1.0)
+        except validate.Invalid as error:
+            raise SystemExit(f"error: {error}")
+        _send(args.text, args.wav, args.play, amplitude)

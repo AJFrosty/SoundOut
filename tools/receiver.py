@@ -1,3 +1,9 @@
+import sys as _sys
+from pathlib import Path as _Path
+
+if __package__ in (None, ""):
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import argparse
 import time
 
@@ -7,6 +13,7 @@ import sounddevice as sd
 from soundout.island.reports import ingest
 from soundout.island.situation import describe
 from soundout.island.store import Store
+from soundout.island import validate
 from soundout.radio.tones import RATE
 
 
@@ -46,15 +53,25 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    device = args.device if args.device is not None else pick_input()
+    try:
+        chunk = validate.seconds(args.chunk, "chunk", 1.0, 60.0)
+        overlap = validate.seconds(args.overlap, "overlap", 0.0, 30.0)
+        chosen = validate.audio_device(args.device, "input")
+    except validate.Invalid as error:
+        raise SystemExit(f"error: {error}")
+
+    if overlap >= chunk:
+        raise SystemExit(f"error: overlap ({overlap}s) must be shorter than chunk ({chunk}s)")
+
+    device = chosen if chosen is not None else pick_input()
     store = Store(args.db)
 
     print(f"listening on {sd.query_devices(device)['name']}")
     print(f"writing to {args.db} — ctrl-c to stop\n")
 
     tail = np.zeros(0)
-    frames = int(RATE * args.chunk)
-    keep = int(RATE * args.overlap)
+    frames = int(RATE * chunk)
+    keep = int(RATE * overlap)
 
     try:
         while True:

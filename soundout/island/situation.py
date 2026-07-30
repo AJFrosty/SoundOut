@@ -60,8 +60,23 @@ class BitReader:
 def needs_mask(names):
     mask = 0
     for name in names:
+        if name not in NEEDS:
+            raise ValueError(f"unknown need {name!r}; choose from: {', '.join(NEEDS)}")
         mask |= 1 << NEEDS.index(name)
     return mask
+
+
+def access_index(access):
+    if isinstance(access, str):
+        if access not in ACCESS:
+            raise ValueError(f"unknown access state {access!r}; "
+                             f"choose from: {', '.join(ACCESS)}")
+        return ACCESS.index(access)
+
+    if not isinstance(access, int) or not 0 <= access < len(ACCESS):
+        raise ValueError(f"access must be one of: {', '.join(ACCESS)}")
+
+    return access
 
 
 def needs_list(mask):
@@ -76,15 +91,18 @@ def encode_report(reporter, shelter, occupancy, capacity, needs, casualties, acc
         "shelter": shelter,
         "occupancy": occupancy,
         "capacity": capacity,
-        "needs": needs_mask(needs) if not isinstance(needs, int) else needs,
+        "needs": needs if isinstance(needs, int) else needs_mask(needs),
         "casualties": casualties,
-        "access": ACCESS.index(access) if isinstance(access, str) else access,
+        "access": access_index(access),
         "minutes": minutes,
         "reserved": 0,
     }
 
     for name, bits in FIELDS:
-        writer.write(values[name], bits)
+        try:
+            writer.write(values[name], bits)
+        except ValueError as error:
+            raise ValueError(f"{name}: {error}") from None
 
     return writer.to_bytes()
 

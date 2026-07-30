@@ -36,6 +36,8 @@
     padding:12px 12px;min-height:48px}
   input:focus,select:focus{outline:2px solid var(--signal);outline-offset:1px;
     border-color:var(--signal)}
+  input.bad,select.bad{border-color:var(--bad);background:#1E1013}
+  .fieldnote{font-size:.75rem;color:var(--bad);margin-top:5px;min-height:1em}
 
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{padding:10px 13px;border-radius:999px;border:1px solid var(--line);
@@ -90,15 +92,20 @@
     <h2>Shelter</h2>
     <div class="grid">
       <div><label for="shelter">Shelter number</label>
-        <input id="shelter" type="number" inputmode="numeric" min="0" max="4095" value="37"></div>
+        <input id="shelter" type="number" inputmode="numeric" min="0" max="4095" value="37">
+        <div class="fieldnote" id="note-shelter"></div></div>
       <div><label for="reporter">Reporter ID</label>
-        <input id="reporter" type="number" inputmode="numeric" min="0" max="8191" value="1041"></div>
+        <input id="reporter" type="number" inputmode="numeric" min="0" max="8191" value="1041">
+        <div class="fieldnote" id="note-reporter"></div></div>
       <div><label for="people">People here</label>
-        <input id="people" type="number" inputmode="numeric" min="0" max="1023" value="42"></div>
+        <input id="people" type="number" inputmode="numeric" min="0" max="1023" value="42">
+        <div class="fieldnote" id="note-people"></div></div>
       <div><label for="capacity">Places</label>
-        <input id="capacity" type="number" inputmode="numeric" min="0" max="1023" value="60"></div>
+        <input id="capacity" type="number" inputmode="numeric" min="0" max="1023" value="60">
+        <div class="fieldnote" id="note-capacity"></div></div>
       <div><label for="casualties">Casualties</label>
-        <input id="casualties" type="number" inputmode="numeric" min="0" max="127" value="2"></div>
+        <input id="casualties" type="number" inputmode="numeric" min="0" max="127" value="2">
+        <div class="fieldnote" id="note-casualties"></div></div>
       <div><label for="access">Road access</label>
         <select id="access">
           <option>open</option><option>debris</option>
@@ -316,7 +323,61 @@ NEEDS.forEach(name=>{
   chipBox.appendChild(chip);
 });
 
-const value = id => parseInt(document.getElementById(id).value||"0",10);
+const RULES = {
+  shelter:    {label:"Shelter number", max:4095},
+  reporter:   {label:"Reporter ID",    max:8191},
+  people:     {label:"People here",    max:1023},
+  capacity:   {label:"Places",         max:1023},
+  casualties: {label:"Casualties",     max:127}
+};
+
+function readField(id){
+  const el = document.getElementById(id);
+  const rule = RULES[id];
+  const raw = el.value.trim();
+
+  if(raw === "")            return {error:rule.label+" is required"};
+  if(!/^\d+$/.test(raw))    return {error:rule.label+" must be a whole number"};
+
+  const number = Number(raw);
+  if(!Number.isSafeInteger(number)) return {error:rule.label+" is not a valid number"};
+  if(number > rule.max)     return {error:rule.label+" cannot exceed "+rule.max};
+
+  return {value:number};
+}
+
+function validateAll(){
+  const values = {}; const problems = [];
+
+  for(const id of Object.keys(RULES)){
+    const outcome = readField(id);
+    const input = document.getElementById(id);
+    const note = document.getElementById("note-"+id);
+
+    if(outcome.error){
+      input.classList.add("bad");
+      input.setAttribute("aria-invalid","true");
+      note.textContent = outcome.error;
+      problems.push(outcome.error);
+    }else{
+      input.classList.remove("bad");
+      input.removeAttribute("aria-invalid");
+      note.textContent = "";
+      values[id] = outcome.value;
+    }
+  }
+
+  if(!ACCESS.includes(document.getElementById("access").value))
+    problems.push("Road access is not one of the known states");
+
+  if(problems.length === 0 && values.capacity > 0 && values.people > values.capacity * 4)
+    problems.push("That is "+values.people+" people in "+values.capacity+
+                  " places — check the numbers");
+
+  return {values, problems};
+}
+
+const value = id => readField(id).value ?? 0;
 
 function compose(){
   let mask=0;
@@ -336,12 +397,22 @@ function compose(){
 }
 
 function refresh(){
+  const {problems} = validateAll();
+
+  if(problems.length){
+    document.getElementById("readout").textContent = "—";
+    document.getElementById("send").disabled = true;
+    setStatus(problems[0], "err");
+    return false;
+  }
+
   try{
     const {report,frame}=compose();
     const seconds=(CHIRP+GUARD+frame.length*4*SYMBOL);
     document.getElementById("readout").innerHTML =
       `<b>${hex(report)}</b> + tag<br>${frame.length} bytes &middot; ${seconds.toFixed(2)} s of tone`;
     document.getElementById("send").disabled=false;
+    setStatus("Hold the phone near the radio microphone, then send.");
     return true;
   }catch(error){
     document.getElementById("readout").textContent="—";

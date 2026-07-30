@@ -1,3 +1,9 @@
+import sys as _sys
+from pathlib import Path as _Path
+
+if __package__ in (None, ""):
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import argparse
 
 import numpy as np
@@ -7,6 +13,7 @@ from soundout.island.reports import build_report
 from soundout.island.situation import REPORT_BYTES, describe
 from soundout.radio.link import receive, transmit
 from soundout.radio.tones import RATE
+from soundout.island import validate
 
 REPORT = dict(
     reporter=1041, shelter=37, people=42, capacity=60,
@@ -82,6 +89,13 @@ if __name__ == "__main__":
     parser.add_argument("--text", type=str, default=None)
     parser.add_argument("--wav", type=str, default=None)
     args = parser.parse_args()
+
+    try:
+        validate.fraction(args.amplitude, "amplitude", 0.05, 1.0)
+        validate.audio_device(args.in_device, "input")
+        validate.audio_device(args.out_device, "output")
+    except validate.Invalid as error:
+        raise SystemExit(f"error: {error}")
 
     auto_in, auto_out = same_api_pair()
     in_device = args.in_device if args.in_device is not None else auto_in

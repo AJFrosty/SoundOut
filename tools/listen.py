@@ -1,3 +1,9 @@
+import sys as _sys
+from pathlib import Path as _Path
+
+if __package__ in (None, ""):
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import argparse
 
 import numpy as np
@@ -7,6 +13,7 @@ from soundout.island.situation import REPORT_BYTES, describe
 from soundout.island.trust import TAG_BYTES
 from soundout.radio.link import receive
 from soundout.radio.tones import RATE
+from soundout.island import validate
 
 
 def pick_input():
@@ -51,11 +58,17 @@ def main():
     parser.add_argument("--expect", type=str, default=None, help="compare against this text")
     args = parser.parse_args()
 
-    device = args.device if args.device is not None else pick_input()
-    print(f"device : {sd.query_devices(device)['name']}")
-    print(f"listening for {args.seconds:.0f} s — play the burst now")
+    try:
+        listen_for = validate.seconds(args.seconds, "seconds", 0.5, 600.0)
+        chosen = validate.audio_device(args.device, "input")
+    except validate.Invalid as error:
+        raise SystemExit(f"error: {error}")
 
-    frames = int(RATE * args.seconds)
+    device = chosen if chosen is not None else pick_input()
+    print(f"device : {sd.query_devices(device)['name']}")
+    print(f"listening for {listen_for:.0f} s — play the burst now")
+
+    frames = int(RATE * listen_for)
     heard = sd.rec(frames, samplerate=RATE, channels=1, device=device, blocking=True)
     signal = heard.flatten().astype(np.float64)
 

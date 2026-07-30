@@ -1,8 +1,15 @@
+import sys as _sys
+from pathlib import Path as _Path
+
+if __package__ in (None, ""):
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import argparse
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from soundout.island.store import Store
+from soundout.island import validate
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><title>SoundOut — island picture</title>
@@ -89,6 +96,15 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
+    try:
+        chosen_port = validate.port(args.port)
+    except validate.Invalid as error:
+        raise SystemExit(f"error: {error}")
+
     Handler.database = args.db
-    print(f"dashboard on http://localhost:{args.port}  (reading {args.db})")
-    HTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
+    print(f"dashboard on http://localhost:{chosen_port}  (reading {args.db})")
+
+    try:
+        HTTPServer(("127.0.0.1", chosen_port), Handler).serve_forever()
+    except OSError as error:
+        raise SystemExit(f"error: could not listen on port {chosen_port} - {error}")
