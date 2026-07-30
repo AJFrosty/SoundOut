@@ -136,6 +136,35 @@ path, delivers it through a noisy channel, lists your audio devices, and flags a
 files left over from an older frame format. Audio recorded before a format change cannot
 decode and has to be regenerated — the check names those files.
 
+## Is it worth it?
+
+`docs/comparison.svg` puts SoundOut against what an island actually has. The measure is
+**staleness** - how old the information the base is acting on is - because a coordinator
+sending water does not ask whether a report arrived, but how old the number is.
+
+```
+python -m experiments.comparison
+```
+
+| hour | nothing | a runner | cellular | SoundOut | a perfect link |
+|---|---|---|---|---|---|
+| 6 | 6.0 | 6.0 | 6.0 | **3.1** | 2.5 |
+| 24 | 24.0 | 9.2 | 24.0 | **4.4** | 2.8 |
+| 60 | 14.7 | 8.7 | **2.8** | 6.2 | 2.7 |
+
+A perfect link settles at 2.9 h rather than zero, because the island keeps changing while
+you watch it. That is the floor, and SoundOut runs close to it while the phones are down.
+Once they return, cellular wins outright - the claim is not that a $50 radio beats a
+working phone network, but that the window where nothing else works is when the reports
+matter most.
+
+The honest cost: **9% of shelters have no neighbour in reach and are never heard from at
+all**, while a runner is three times staler but eventually reaches everybody. They are
+complements rather than competitors.
+
+Time for the base to learn about a new emergency: **0.5 h** by SoundOut, 6.8 h by runner,
+42 h waiting for the phones.
+
 ## Passing it on
 
 A station can repeat what it heard. That is the difference between this and a walkie-talkie:

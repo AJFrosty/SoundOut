@@ -20,6 +20,7 @@ MODULES = [
     "soundout.island.relay",
     "tools.report", "tools.receiver", "tools.listen", "tools.dashboard",
     "tools.airtest", "tools.loopback", "tools.audiocheck", "tools.relay",
+    "experiments.comparison", "experiments.chart",
 ]
 
 PASS = "ok  "

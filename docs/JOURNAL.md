@@ -890,6 +890,100 @@ clears.
 
 ---
 
+## Weekend 9 - what is it actually worth?
+
+**Goal:** the system works. That is not the same as being worth building. Put it against
+the alternatives a Caribbean island actually has, and be willing to lose.
+
+### Choosing the right question
+
+The obvious measure is *did the message arrive*, and it is the wrong one. A coordinator
+deciding where to send water does not ask whether a report arrived, but **how old the
+number in front of them is**. Dispatching on a six-hour-old occupancy figure sends the
+wrong amount to the wrong place whether or not the message technically got through.
+
+So the measure here is **staleness**: the age of the freshest information the base holds
+about each shelter, averaged across the island, minute by minute for three days. Twelve
+shelters across 30 km, roads blocked at the start and clearing over the first day or so,
+each shelter's situation genuinely changing every few hours.
+
+Four alternatives, and a floor:
+
+- **nothing** - word reaches the base when somebody eventually walks in
+- **a runner** every 6 hours, by motorbike where the road is open and on foot where it is not
+- **cellular**, dead until the network returns, then perfect. Restoration is set at 48
+  hours, which is *optimistic*: after Maria, Dominica and Puerto Rico measured restoration
+  in weeks. The assumption that most flatters the alternative is the one to be generous with.
+- **SoundOut**, a report every 30 minutes, delivered according to the settling curve
+  **measured last weekend** rather than assumed
+- **a perfect link**, which is told of every change the instant it happens
+
+| hour | nothing | runner | cellular | SoundOut | perfect |
+|---|---|---|---|---|---|
+| 3 | 3.0 | 3.0 | 3.0 | **2.1** | 1.8 |
+| 6 | 6.0 | 6.0 | 6.0 | **3.1** | 2.5 |
+| 12 | 12.0 | 8.7 | 12.0 | **3.7** | 2.8 |
+| 24 | 24.0 | 9.2 | 24.0 | **4.4** | 2.8 |
+| 60 | 14.7 | 8.7 | **2.8** | 6.2 | 2.7 |
+
+### The floor is the interesting part
+
+A perfect link never reaches zero. It settles at about 2.9 hours, because the island keeps
+changing while you watch it - that residue is the cost of the world moving, not of the
+link. Without that line on the chart, SoundOut's 3.1 hours at hour 6 looks like a
+mediocre result. Against the floor it is **within 0.6 hours of the best any system could
+possibly do**, and the remaining gap is the protocol.
+
+### Where it loses, and saying so
+
+After the phones come back, cellular wins outright and the curves cross. That is in the
+chart and it belongs there. The claim was never that a $50 radio beats a working phone
+network; it is that the window where nothing else works is precisely the window where the
+reports matter most.
+
+The more uncomfortable finding came from fixing a flaw in the model. Every report was
+rolling the delivery odds afresh, so over 144 reports even a shelter joined to nothing
+succeeded eventually by sheer repetition. That is false - a stranded shelter is stranded
+permanently, not unlucky repeatedly. Once 8% of shelters were made properly unreachable,
+matching the geography ceiling measured in relaytest:
+
+| method | fresher than 6 h | never heard from |
+|---|---|---|
+| nothing | 8% | 0% |
+| a runner | 25% | **0%** |
+| cellular | 42% | 0% |
+| SoundOut | **76%** | **9%** |
+
+**SoundOut is far fresher for the shelters it reaches, and never hears from the ones it
+does not.** A runner is three times staler but eventually reaches everybody. Those are
+complements, not competitors, and the honest recommendation is both - which is a more
+credible thing to tell a coordinator than a clean sweep.
+
+### How long before anyone knows
+
+An emergency happens at hour 6. How long until the base finds out?
+
+| method | median | worst case |
+|---|---|---|
+| nothing | 20.2 h | 21.8 h |
+| a runner | 6.8 h | 7.4 h |
+| cellular | 42.0 h | 42.0 h |
+| **SoundOut** | **0.5 h** | **1.0 h** |
+
+Half an hour against seven, and the half hour is simply the reporting interval.
+
+### The chart
+
+`docs/comparison.svg`, drawn by hand in `experiments/chart.py`. No plotting library: the
+project already asks for three dependencies and a chart drawn once a weekend does not
+justify a fourth. SVG is text.
+
+Every assumption is a named constant at the top of `experiments/comparison.py`, so anyone
+who thinks 48 hours is the wrong restoration time, or that runners go faster than that,
+can change one line and re-run the whole comparison.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -936,4 +1030,4 @@ refactor changed nothing.
 - [x] Forward error correction, worth about 2 dB for 0.48 s
 - [ ] Over a handheld radio, and across a room at distance
 - [x] Store and forward: stations repeat what they heard, worst first
-- [ ] The mobility simulator and the comparison chart
+- [x] The comparison against a runner, cellular and nothing, with the chart
