@@ -104,6 +104,17 @@ python -m tools.report --shelter 12 --people 180 --capacity 180 --needs water,fo
 
 `python -m tools.audiocheck` first if you are not sure which device is which.
 
+If anything misbehaves, ask the system to check itself:
+
+```
+python -m tools.selfcheck
+```
+
+It loads every module, pushes a report through memory, a wav file and the receiver's own
+path, delivers it through a noisy channel, lists your audio devices, and flags any wav
+files left over from an older frame format. Audio recorded before a format change cannot
+decode and has to be regenerated — the check names those files.
+
 ## Parameters
 
 | | |
