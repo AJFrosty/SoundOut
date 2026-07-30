@@ -143,6 +143,56 @@ def check_stale_audio():
     return True
 
 
+def check_field_page():
+    import re
+
+    from soundout.island.situation import ACCESS, NEEDS, encode_report
+    from soundout.island.trust import derive_key, tag
+    from soundout.radio.framing import build_frame
+
+    page = _Path(__file__).resolve().parents[1] / "field.html"
+    print("\nfield.html agrees with this build")
+
+    if not page.exists():
+        return line(FAIL, "field.html is missing")
+
+    html = page.read_text(encoding="utf-8")
+
+    report = encode_report(
+        reporter=1041, shelter=37, occupancy=42, capacity=60,
+        needs=["water", "insulin"], casualties=2, access="impassable",
+        minutes=1_234_567)
+
+    key = derive_key(1041)
+    payload = report + tag(report, key)
+
+    expected = {
+        "report": report.hex(),
+        "key": key.hex(),
+        "tag": tag(report, key).hex(),
+        "frame": build_frame(payload).hex(),
+    }
+
+    healthy = True
+    for name, value in expected.items():
+        found = re.search(name + r':"([0-9a-f]+)"', html)
+
+        if not found:
+            healthy = line(FAIL, f"{name} vector missing from the page") and healthy
+        elif found.group(1) != value:
+            healthy = line(FAIL, f"{name} vector is stale",
+                           "the page will build frames this build cannot read") and healthy
+        else:
+            healthy = line(PASS, f"{name} vector matches") and healthy
+
+    if not healthy:
+        print("\n  The page carries its own copy of the schema, crypto and framing, so its"
+              "\n  own self-test only proves it agrees with itself. Regenerate the vectors"
+              "\n  in field.html whenever the frame format changes.")
+
+    return healthy
+
+
 def check_audio_devices():
     print("\naudio devices")
     try:
@@ -196,7 +246,8 @@ def main():
         raise SystemExit(1)
 
     print()
-    results = [check_imports(), check_pipeline(), check_noise(), check_stale_audio()]
+    results = [check_imports(), check_pipeline(), check_noise(),
+               check_field_page(), check_stale_audio()]
 
     if not args.skip_audio:
         results.append(check_audio_devices())

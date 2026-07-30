@@ -101,7 +101,12 @@ def main():
                 now = time.monotonic()
                 if not args.quiet and now - last_meter >= 3.0:
                     bar = "#" * min(int(loudest * 40), 20)
-                    state = "silent — is the right device selected?" if loudest < 1e-4 else bar
+                    if loudest < 1e-4:
+                        state = "silent — is the right device selected?"
+                    elif loudest > 0.98:
+                        state = f"{bar}  CLIPPING — turn the volume down"
+                    else:
+                        state = bar
                     print(f"  [level {loudest:.4f}] {state}")
                     loudest = 0.0
                     last_meter = now

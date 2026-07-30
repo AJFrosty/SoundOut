@@ -148,6 +148,7 @@ const FIELDS = [["version",3],["reporter",13],["shelter",12],["occupancy",10],
                 ["minutes",22],["reserved",4]];
 const EPOCH = Date.UTC(2026,0,1);
 const MASTER = "soundout-demo-master-key-not-for-real-use";
+const FORMAT_VERSION = 2;
 
 function packReport(v){
   let bits = "";
@@ -254,9 +255,13 @@ function rsEncode(data, parity){
 }
 
 function buildFrame(payload, parity=6){
-  const protectedBytes = new Uint8Array(payload.length+1);
-  protectedBytes.set(payload); protectedBytes[payload.length]=crc8(payload);
-  const codeword = rsEncode(protectedBytes, parity);
+  const body = new Uint8Array(payload.length+1);
+  body[0]=FORMAT_VERSION; body.set(payload,1);
+
+  const guarded = new Uint8Array(body.length+1);
+  guarded.set(body); guarded[body.length]=crc8(body);
+
+  const codeword = rsEncode(guarded, parity);
   return new Uint8Array([payload.length,payload.length,payload.length,...codeword]);
 }
 
@@ -455,7 +460,7 @@ document.getElementById("send").onclick=async ()=>{
     report:"24110250a83c0050492d6870",
     key:"527fecfdeb0f5b64f425ba8a181fc634e30a77a9f16fb372a8279d7954e20318",
     tag:"477f3462",
-    frame:"10101024110250a83c0050492d6870477f34629a7b0ab72a0ccb"
+    frame:"1010100224110250a83c0050492d6870477f346286df35e31886a2"
   };
 
   const report=packReport({version:1,reporter:1041,shelter:37,occupancy:42,capacity:60,
