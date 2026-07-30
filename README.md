@@ -1,6 +1,8 @@
+<img src="docs/logo.svg" width="72" align="left" alt="">
+
 # SoundOut
 
-Structured disaster reports carried over sound, so an island can keep a shared situation
+**Structured disaster reports carried over sound**, so an island can keep a shared situation
 picture when the towers and the power are down. A phone with no signal can still make a
 noise, and a handheld radio still carries it.
 
@@ -48,6 +50,21 @@ docs/JOURNAL.md     the reasoning, the measurements and the failures
 ```
 
 Everything runs from the repository root with `-m`, so no installation is needed.
+
+## The field device is a web page
+
+`field.html` is the whole reporting end: open it on any phone, from a file or a memory
+card, with no internet and no install. Tap the shelter's numbers, hold the phone to a
+radio microphone, press transmit.
+
+It reimplements the schema, HMAC-SHA256, CRC-8, Reed-Solomon and the modem in about 300
+lines of plain JavaScript, with no libraries and no network requests, so it works from a
+`file://` URL on a phone that has never seen a network. On load it checks its own output
+against vectors produced by the Python reference and shows a green dot only if the schema,
+key derivation, tag, CRC and Reed-Solomon parity all match byte for byte.
+
+That is the point of the project in one file: the person reporting needs a phone and
+nothing else — no app store, no licence, no training, no signal.
 
 ## Try it without hardware
 

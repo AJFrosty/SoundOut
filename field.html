@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1A26">
+<title>SoundOut — field report</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='31' fill='%230E1A26'/%3E%3Cg fill='none' stroke='%23F6A623' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M20.3 32.6 A12 12 0 0 1 43.7 32.6'/%3E%3Cpath d='M14.7 29.4 A18 18 0 0 1 49.3 29.4' opacity='.6'/%3E%3Cpath d='M9.2 26.2 A24 24 0 0 1 54.8 26.2' opacity='.3'/%3E%3C/g%3E%3Cpath d='M20 46 Q32 29 44 46 Z' fill='%23E8EDF2'/%3E%3Cpath d='M8 46 H56' stroke='%232E7D74' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --ink:#0E1A26; --panel:#152534; --line:#22384B; --text:#E8EDF2;
+    --muted:#8AA3B8; --signal:#F6A623; --sea:#2E7D74; --bad:#E8705A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink);color:var(--text);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-text-size-adjust:100%}
+  .wrap{max-width:520px;margin:0 auto;padding:20px 18px 48px}
+
+  header{display:flex;align-items:center;gap:12px;padding:6px 0 18px}
+  header svg{width:40px;height:40px;flex:0 0 auto}
+  .name{font-size:1.25rem;font-weight:650;letter-spacing:.2px}
+  .name b{color:var(--signal);font-weight:650}
+  .tag{font-size:.76rem;color:var(--muted);margin-top:1px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px;margin-bottom:14px}
+  .card h2{margin:0 0 12px;font-size:.72rem;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--muted);font-weight:600}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:5px}
+  input,select{width:100%;font:inherit;font-size:1.05rem;color:var(--text);
+    background:#0D1922;border:1px solid var(--line);border-radius:10px;
+    padding:12px 12px;min-height:48px}
+  input:focus,select:focus{outline:2px solid var(--signal);outline-offset:1px;
+    border-color:var(--signal)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:10px 13px;border-radius:999px;border:1px solid var(--line);
+    background:#0D1922;color:var(--muted);font-size:.88rem;cursor:pointer;
+    user-select:none;min-height:44px;display:inline-flex;align-items:center}
+  .chip[aria-pressed="true"]{background:var(--signal);border-color:var(--signal);
+    color:#231603;font-weight:600}
+
+  button.send{width:100%;min-height:64px;font:inherit;font-size:1.15rem;font-weight:650;
+    color:#231603;background:var(--signal);border:0;border-radius:14px;cursor:pointer;
+    letter-spacing:.3px}
+  button.send:disabled{opacity:.55;cursor:default}
+  button.send.sending{background:var(--sea);color:#04211E}
+
+  .readout{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
+    word-break:break-all}
+  .readout b{color:var(--text);font-weight:600}
+  .status{margin-top:12px;font-size:.9rem;color:var(--muted);min-height:1.5em}
+  .status.ok{color:var(--sea)}
+  .status.err{color:var(--bad)}
+
+  .selftest{display:flex;align-items:center;gap:9px;font-size:.78rem;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+  .dot.ok{background:var(--sea)}
+  .dot.bad{background:var(--bad)}
+
+  .hint{font-size:.78rem;color:var(--muted);margin:10px 0 0}
+  @media (max-width:380px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="31" fill="#0E1A26"/>
+      <g fill="none" stroke="#F6A623" stroke-width="3" stroke-linecap="round">
+        <path d="M20.3 32.6 A12 12 0 0 1 43.7 32.6"/>
+        <path d="M14.7 29.4 A18 18 0 0 1 49.3 29.4" opacity=".6"/>
+        <path d="M9.2 26.2 A24 24 0 0 1 54.8 26.2" opacity=".3"/>
+      </g>
+      <path d="M20 46 Q32 29 44 46 Z" fill="#E8EDF2"/>
+      <path d="M8 46 H56" stroke="#2E7D74" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <div class="name">Sound<b>Out</b></div>
+      <div class="tag">field report &middot; works with no signal</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <h2>Shelter</h2>
+    <div class="grid">
+      <div><label for="shelter">Shelter number</label>
+        <input id="shelter" type="number" inputmode="numeric" min="0" max="4095" value="37"></div>
+      <div><label for="reporter">Reporter ID</label>
+        <input id="reporter" type="number" inputmode="numeric" min="0" max="8191" value="1041"></div>
+      <div><label for="people">People here</label>
+        <input id="people" type="number" inputmode="numeric" min="0" max="1023" value="42"></div>
+      <div><label for="capacity">Places</label>
+        <input id="capacity" type="number" inputmode="numeric" min="0" max="1023" value="60"></div>
+      <div><label for="casualties">Casualties</label>
+        <input id="casualties" type="number" inputmode="numeric" min="0" max="127" value="2"></div>
+      <div><label for="access">Road access</label>
+        <select id="access">
+          <option>open</option><option>debris</option>
+          <option selected>impassable</option><option>flooded</option>
+          <option>bridge down</option><option>landslide</option><option>unknown</option>
+        </select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What is needed</h2>
+    <div class="chips" id="needs"></div>
+  </div>
+
+  <div class="card">
+    <h2>Transmission</h2>
+    <div class="readout" id="readout">&nbsp;</div>
+    <div class="status" id="status">Hold the phone near the radio microphone, then send.</div>
+  </div>
+
+  <button class="send" id="send">Transmit report</button>
+  <p class="hint">The tone carries the whole report. Keep it playing until it finishes.</p>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Self check</h2>
+    <div class="selftest"><span class="dot" id="dot"></span><span id="selftest">checking…</span></div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* ---------- the schema ---------- */
+const NEEDS = ["water","food","insulin","dialysis","baby formula","fuel",
+               "tarpaulin","medic","evacuation","sanitation","comms","power"];
+const ACCESS = ["open","debris","impassable","flooded","bridge down","landslide","unknown"];
+const FIELDS = [["version",3],["reporter",13],["shelter",12],["occupancy",10],
+                ["capacity",10],["needs",12],["casualties",7],["access",3],
+                ["minutes",22],["reserved",4]];
+const EPOCH = Date.UTC(2026,0,1);
+const MASTER = "soundout-demo-master-key-not-for-real-use";
+
+function packReport(v){
+  let bits = "";
+  for(const [name,width] of FIELDS){
+    const value = v[name] >>> 0;
+    if(value >= 2**width) throw new Error(name+" does not fit in "+width+" bits");
+    bits += value.toString(2).padStart(width,"0");
+  }
+  const out = new Uint8Array(bits.length/8);
+  for(let i=0;i<out.length;i++) out[i] = parseInt(bits.substr(i*8,8),2);
+  return out;
+}
+
+/* ---------- sha-256 and hmac, so no secure context is needed ---------- */
+const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+
+function sha256(bytes){
+  const ml = bytes.length*8;
+  const withPad = new Uint8Array((((bytes.length+9)+63)>>6)<<6);
+  withPad.set(bytes); withPad[bytes.length]=0x80;
+  new DataView(withPad.buffer).setUint32(withPad.length-4, ml>>>0);
+  new DataView(withPad.buffer).setUint32(withPad.length-8, Math.floor(ml/2**32));
+
+  let h=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w=new Uint32Array(64), view=new DataView(withPad.buffer);
+  const rr=(x,n)=>(x>>>n)|(x<<(32-n));
+
+  for(let off=0;off<withPad.length;off+=64){
+    for(let i=0;i<16;i++) w[i]=view.getUint32(off+i*4);
+    for(let i=16;i<64;i++){
+      const s0=rr(w[i-15],7)^rr(w[i-15],18)^(w[i-15]>>>3);
+      const s1=rr(w[i-2],17)^rr(w[i-2],19)^(w[i-2]>>>10);
+      w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+    }
+    let [a,b,c,d,e,f,g,hh]=h;
+    for(let i=0;i<64;i++){
+      const S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^(~e&g);
+      const t1=(hh+S1+ch+K[i]+w[i])>>>0;
+      const S0=rr(a,2)^rr(a,13)^rr(a,22), maj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+maj)>>>0;
+      hh=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+    }
+    h=[(h[0]+a)>>>0,(h[1]+b)>>>0,(h[2]+c)>>>0,(h[3]+d)>>>0,
+       (h[4]+e)>>>0,(h[5]+f)>>>0,(h[6]+g)>>>0,(h[7]+hh)>>>0];
+  }
+  const out=new Uint8Array(32), dv=new DataView(out.buffer);
+  h.forEach((x,i)=>dv.setUint32(i*4,x));
+  return out;
+}
+
+function hmac(key, message){
+  let k = key.length>64 ? sha256(key) : key;
+  const pad = new Uint8Array(64); pad.set(k);
+  const inner=new Uint8Array(64), outer=new Uint8Array(64);
+  for(let i=0;i<64;i++){ inner[i]=pad[i]^0x36; outer[i]=pad[i]^0x5c; }
+  const a=new Uint8Array(64+message.length); a.set(inner); a.set(message,64);
+  const b=new Uint8Array(96); b.set(outer); b.set(sha256(a),64);
+  return sha256(b);
+}
+
+const encoder = new TextEncoder();
+const deriveKey = id => hmac(encoder.encode(MASTER), new Uint8Array([id>>8&255, id&255]));
+const tagFor = (report,key) => hmac(key,report).slice(0,4);
+
+/* ---------- crc-8 and reed-solomon over GF(256) ---------- */
+function crc8(bytes){
+  let rem=0;
+  for(const byte of bytes){
+    rem^=byte;
+    for(let i=0;i<8;i++) rem = (rem&0x80) ? ((rem<<1)^0x07)&0xFF : (rem<<1)&0xFF;
+  }
+  return rem;
+}
+
+const EXP=new Uint8Array(512), LOG=new Uint8Array(256);
+(()=>{ let x=1;
+  for(let i=0;i<255;i++){ EXP[i]=x; LOG[x]=i; x<<=1; if(x&256) x^=0x11D; }
+  for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
+})();
+const gmul=(a,b)=> (a===0||b===0) ? 0 : EXP[LOG[a]+LOG[b]];
+const gpow=(a,n)=> a===0 ? 0 : EXP[(LOG[a]*n)%255];
+
+function rsEncode(data, parity){
+  let g=[1];
+  for(let i=0;i<parity;i++){
+    const next=new Array(g.length+1).fill(0);
+    for(let j=0;j<g.length;j++){ next[j]^=g[j]; next[j+1]^=gmul(g[j],gpow(2,i)); }
+    g=next;
+  }
+  const rem=[...data, ...new Array(parity).fill(0)];
+  for(let i=0;i<data.length;i++){
+    const c=rem[i];
+    if(!c) continue;
+    for(let j=0;j<g.length;j++) rem[i+j]^=gmul(g[j],c);
+  }
+  return new Uint8Array([...data, ...rem.slice(data.length)]);
+}
+
+function buildFrame(payload, parity=6){
+  const protectedBytes = new Uint8Array(payload.length+1);
+  protectedBytes.set(payload); protectedBytes[payload.length]=crc8(payload);
+  const codeword = rsEncode(protectedBytes, parity);
+  return new Uint8Array([payload.length,payload.length,payload.length,...codeword]);
+}
+
+/* ---------- the modem ---------- */
+const RATE=44100, SYMBOL=0.02, TONES=[1000,1200,1400,1600];
+const CHIRP=0.1, CHIRP_LOW=800, CHIRP_HIGH=2400, GUARD=0.02;
+
+function bytesToSymbols(bytes){
+  const out=[];
+  for(const b of bytes){ out.push(b>>6&3, b>>4&3, b>>2&3, b&3); }
+  return out;
+}
+
+function buildSignal(frame, amplitude=0.7){
+  const symbols=bytesToSymbols(frame);
+  const n=Math.round(RATE*CHIRP), guard=Math.round(RATE*GUARD),
+        per=Math.round(RATE*SYMBOL);
+  const total=n+guard+symbols.length*per;
+  const buffer=new Float32Array(total);
+
+  const taper=Math.round(n*0.1);
+  for(let i=0;i<n;i++){
+    const t=i/RATE;
+    const sweep=CHIRP_LOW*t+(CHIRP_HIGH-CHIRP_LOW)*t*t/(2*CHIRP);
+    let w=1;
+    if(i<taper) w=i/taper; else if(i>n-taper) w=(n-i)/taper;
+    buffer[i]=amplitude*w*Math.sin(2*Math.PI*sweep);
+  }
+
+  let at=n+guard;
+  for(const s of symbols){
+    const f=TONES[s];
+    for(let i=0;i<per;i++) buffer[at+i]=amplitude*Math.sin(2*Math.PI*f*i/RATE);
+    at+=per;
+  }
+  return buffer;
+}
+
+async function play(samples){
+  const ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:RATE});
+  if(ctx.state==="suspended") await ctx.resume();
+  const buffer=ctx.createBuffer(1,samples.length,RATE);
+  buffer.copyToChannel(samples,0);
+  const source=ctx.createBufferSource();
+  source.buffer=buffer; source.connect(ctx.destination); source.start();
+  await new Promise(done=>{ source.onended=done; });
+  await ctx.close();
+}
+
+/* ---------- the page ---------- */
+const hex = bytes => [...bytes].map(b=>b.toString(16).padStart(2,"0")).join("");
+const chosen = new Set(["water","insulin"]);
+const chipBox = document.getElementById("needs");
+
+NEEDS.forEach(name=>{
+  const chip=document.createElement("button");
+  chip.type="button"; chip.className="chip"; chip.textContent=name;
+  chip.setAttribute("aria-pressed", chosen.has(name));
+  chip.onclick=()=>{
+    chosen.has(name) ? chosen.delete(name) : chosen.add(name);
+    chip.setAttribute("aria-pressed", chosen.has(name));
+    refresh();
+  };
+  chipBox.appendChild(chip);
+});
+
+const value = id => parseInt(document.getElementById(id).value||"0",10);
+
+function compose(){
+  let mask=0;
+  chosen.forEach(n=>{ mask |= 1<<NEEDS.indexOf(n); });
+
+  const report = packReport({
+    version:1, reporter:value("reporter"), shelter:value("shelter"),
+    occupancy:value("people"), capacity:value("capacity"), needs:mask,
+    casualties:value("casualties"),
+    access:ACCESS.indexOf(document.getElementById("access").value),
+    minutes:Math.floor((Date.now()-EPOCH)/60000), reserved:0
+  });
+
+  const payload=new Uint8Array(16);
+  payload.set(report); payload.set(tagFor(report,deriveKey(value("reporter"))),12);
+  return {report,payload,frame:buildFrame(payload)};
+}
+
+function refresh(){
+  try{
+    const {report,frame}=compose();
+    const seconds=(CHIRP+GUARD+frame.length*4*SYMBOL);
+    document.getElementById("readout").innerHTML =
+      `<b>${hex(report)}</b> + tag<br>${frame.length} bytes &middot; ${seconds.toFixed(2)} s of tone`;
+    document.getElementById("send").disabled=false;
+    return true;
+  }catch(error){
+    document.getElementById("readout").textContent="—";
+    setStatus(error.message,"err");
+    document.getElementById("send").disabled=true;
+    return false;
+  }
+}
+
+function setStatus(text,kind=""){
+  const el=document.getElementById("status");
+  el.textContent=text; el.className="status "+kind;
+}
+
+document.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",refresh));
+
+document.getElementById("send").onclick=async ()=>{
+  if(!refresh()) return;
+  const button=document.getElementById("send");
+  const {frame}=compose();
+
+  button.disabled=true; button.classList.add("sending");
+  button.textContent="Sending — hold still";
+  setStatus("transmitting…");
+
+  try{
+    await play(buildSignal(frame));
+    setStatus("Sent. Ask the receiver to confirm it arrived.","ok");
+  }catch(error){
+    setStatus("Could not play audio: "+error.message,"err");
+  }
+
+  button.classList.remove("sending");
+  button.textContent="Transmit report"; button.disabled=false;
+};
+
+/* verify this page against vectors produced by the python reference */
+(function selfTest(){
+  const expected={
+    report:"24110250a83c0050492d6870",
+    key:"527fecfdeb0f5b64f425ba8a181fc634e30a77a9f16fb372a8279d7954e20318",
+    tag:"477f3462",
+    frame:"10101024110250a83c0050492d6870477f34629a7b0ab72a0ccb"
+  };
+
+  const report=packReport({version:1,reporter:1041,shelter:37,occupancy:42,capacity:60,
+    needs:(1<<NEEDS.indexOf("water"))|(1<<NEEDS.indexOf("insulin")),
+    casualties:2,access:ACCESS.indexOf("impassable"),minutes:1234567,reserved:0});
+
+  const key=deriveKey(1041), tag=tagFor(report,key);
+  const payload=new Uint8Array(16); payload.set(report); payload.set(tag,12);
+
+  const checks={report:hex(report),key:hex(key),tag:hex(tag),frame:hex(buildFrame(payload))};
+  const failed=Object.keys(expected).filter(k=>checks[k]!==expected[k]);
+
+  const dot=document.getElementById("dot"), label=document.getElementById("selftest");
+  if(failed.length===0){
+    dot.className="dot ok";
+    label.textContent="schema, HMAC, CRC and Reed-Solomon match the Python reference";
+  }else{
+    dot.className="dot bad";
+    label.textContent="MISMATCH in: "+failed.join(", ")+" — do not trust this page";
+  }
+})();
+
+refresh();
+</script>
+</body>
+</html>
