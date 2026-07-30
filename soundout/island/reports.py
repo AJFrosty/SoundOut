@@ -47,7 +47,8 @@ def ingest(signal, store, rate=None):
     if error:
         return {"stored": False, "reason": error, "burst": result["burst"]}
 
-    fresh = store.add(body, authenticated=authentic)
+    fresh = store.add(body, authenticated=authentic,
+                      tag_bytes=result["payload"][REPORT_BYTES:])
 
     return {
         "stored": True,

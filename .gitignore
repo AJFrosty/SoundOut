@@ -4,3 +4,5 @@ __pycache__/
 # Runtime state and generated audio — regenerate with report.py / message.py
 *.db
 *.wav
+relay.db
+*.db-journal

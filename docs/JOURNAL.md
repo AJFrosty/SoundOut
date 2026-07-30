@@ -778,6 +778,118 @@ next person to have the same good idea can see that it was already tried.
 
 ---
 
+## Weekend 8 - the difference between a modem and a network
+
+**Goal:** until now every shelter had to be within earshot of the base. A shelter behind a
+hill was simply lost, and no amount of signal processing changes that. Make stations repeat
+what they heard.
+
+### Why this is the whole argument
+
+The obvious question about this project is *why not just use a walkie-talkie*. Up to this
+weekend the honest answer was thin. A walkie-talkie needs both ends awake at the same
+moment, in range of each other, with a person on each end. So did SoundOut.
+
+Relaying is what breaks that. Shelter A is behind a hill and cannot reach the base.
+Shelter B hears A, keeps it, and repeats it later. The base learns about A **without A and
+the base ever being in contact**, and without anyone deciding in advance that B is a relay.
+
+The convergent store built in weekend 4 had been quietly waiting for this. Observations
+are a grow-only set keyed on their own bytes, and the picture is a deterministic fold, so
+it does not matter how many times a report bounces, in what order things arrive, or which
+station heard what. That property was built and then unused for four weekends. Relaying is
+what cashes it in.
+
+### Three rules, and why each one is necessary
+
+**Forward the original bytes, tag and all.** A relay repeats an observation exactly as it
+arrived and never re-signs it. It therefore cannot forge - it can only choose what to
+repeat. The base still verifies the tag of whoever first wrote the report, however many
+stations it crossed. This forced a change to the store, which had been keeping the 12-byte
+report and throwing the 4-byte tag away; a station cannot pass on what it cannot prove.
+Observations recorded before this change have no tag and are deliberately never relayed.
+
+**Each station repeats each observation once.** This is what makes the traffic stop. With N
+stations an observation can be transmitted at most N times regardless of the island's
+shape, because every station is a station that has already spoken. No hop counter, nothing
+to carry in the packet, nothing to agree on in advance.
+
+**Worst first.** A report takes 2.68 s of airtime. When several are waiting the order is
+by urgency - casualties, then life-safety needs, then being cut off, then being full -
+rather than by arrival. The weights are blunt and readable on purpose: anyone can disagree
+with them, and should be able to see exactly what they are disagreeing with.
+
+### What it is worth
+
+Twelve shelters scattered across an island, the base at the centre, delivery measured
+against how far a station can be heard. Hops are simulated at the packet level - running
+the real modem for every hop would take hours - with per-link odds taken from the measured
+range curve and collisions modelled explicitly.
+
+| reach | out of direct range | no relay | relaying |
+|---|---|---|---|
+| 34 | 4% | 64% | 64% |
+| 26 | 37% | 50% | **74%** |
+| 20 | 64% | 37% | **61%** |
+| 16 | 79% | 22% | **51%** |
+
+When everyone can already reach the base, relaying adds nothing, which is the right
+answer. As shelters get stranded it roughly doubles delivery.
+
+The more revealing measurement is what happens with time. The ceiling is how many shelters
+are joined to the base by *some* chain of hops; the rest are alone on the map and no
+protocol reaches them.
+
+| minutes | no relay | relaying | ceiling |
+|---|---|---|---|
+| 0.9 | 27% | 31% | 92% |
+| 3.6 | 41% | 59% | 92% |
+| 7.1 | **41%** | 70% | 92% |
+| 14.3 | **41%** | 76% | 92% |
+| 28.6 | **43%** | **79%** | 92% |
+
+**Without relaying the curve stops dead at 41% and waiting longer does not move it** - the
+shelters out of earshot are out of earshot permanently. With relaying it keeps climbing
+towards what the geography allows.
+
+### Two bugs in the measurement before any of it could be believed
+
+The first island numbers had 96% of shelters within direct range of the base and only 4%
+delivering. Two faults, both in the simulator rather than the design.
+
+The baseline gave each shelter **one** transmission and no more, which nobody would do; a
+shelter with a radio repeats itself. Both arms now repeat their own report, which is what
+makes the comparison fair.
+
+Worse, the simulation had **no carrier sense**, while `tools/relay.py` waits for the air to
+be quiet before speaking - so it was measuring a protocol that had not been built. Adding
+carrier sense to the model took delivery at reach 34 from 4% to 64%.
+
+Then the ceiling came out *below* the measured delivery, at 70% against 79%, which is
+impossible and so was obviously wrong. It had been computed over reliable links only,
+ignoring marginal ones; a marginal link delivers eventually if it is tried enough times.
+Counting every link with a non-zero chance put the ceiling at 92%, above the curve where a
+ceiling belongs.
+
+### Everyone answers at once
+
+Every station that hears a report wants to repeat it, and they all heard it at the same
+instant. Transmitting immediately guarantees a collision:
+
+| wait spread | delivered | transmissions |
+|---|---|---|
+| 0 slots | **4%** | 39 |
+| 2 slots | 54% | 82 |
+| 4 slots | **60%** | 78 |
+| 16 slots | 42% | 43 |
+
+With no spread the network delivers almost nothing while transmitting constantly. Too much
+spread and it is merely slow. The station waits for quiet **and** a random slice of a
+window, because carrier sense alone just moves the collision to the moment the channel
+clears.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -796,6 +908,7 @@ the island half does not know what a tone is.
 | `soundout/island/situation.py` | the 12-byte schema and its bit packing |
 | `soundout/island/trust.py` | HMAC tags, Ed25519, key derivation |
 | `soundout/island/reports.py` | compose, authenticate, ingest |
+| `soundout/island/relay.py` | which observations to pass on, and in what order |
 | `soundout/island/store.py` | the observation set and the fold |
 | `tools/` | the things a human runs |
 | `experiments/` | every measurement quoted in this journal |
@@ -822,4 +935,5 @@ refactor changed nothing.
 - [x] Live receiver and dashboard
 - [x] Forward error correction, worth about 2 dB for 0.48 s
 - [ ] Over a handheld radio, and across a room at distance
+- [x] Store and forward: stations repeat what they heard, worst first
 - [ ] The mobility simulator and the comparison chart

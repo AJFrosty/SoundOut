@@ -20,6 +20,14 @@ CREATE TABLE IF NOT EXISTS observations (
 CREATE INDEX IF NOT EXISTS by_shelter ON observations(shelter, minutes DESC, reporter DESC);
 """
 
+# the tag is kept so a station can pass an observation on exactly as it arrived. A relay
+# that re-signed what it forwarded would be a relay that could forge; keeping the original
+# reporter's tag means it can only choose what to repeat, never what to say.
+LATER_COLUMNS = [
+    ("tag", "TEXT NOT NULL DEFAULT ''"),
+    ("relayed", "INTEGER NOT NULL DEFAULT 0"),
+]
+
 CURRENT_VIEW = """
 SELECT shelter, reporter, minutes, occupancy, capacity, needs, casualties,
        access, authenticated, heard_at
@@ -40,17 +48,37 @@ class Store:
         self.connection = sqlite3.connect(path)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
+        self._catch_up()
 
-    def add(self, report_bytes, authenticated, heard_at=None):
+    def _catch_up(self):
+        """Add columns a database written by an older build will not have.
+
+        A station in the field cannot be asked to delete its records and start again, so
+        the store grows in place.
+        """
+        present = {row["name"] for row in
+                   self.connection.execute("PRAGMA table_info(observations)")}
+
+        for name, definition in LATER_COLUMNS:
+            if name not in present:
+                self.connection.execute(
+                    f"ALTER TABLE observations ADD COLUMN {name} {definition}")
+
+        self.connection.commit()
+
+    def add(self, report_bytes, authenticated, heard_at=None, tag_bytes=b""):
         fields = decode_report(report_bytes)
         stamp = heard_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         cursor = self.connection.execute(
-            "INSERT OR IGNORE INTO observations VALUES "
+            "INSERT OR IGNORE INTO observations "
+            "(raw, shelter, reporter, minutes, occupancy, capacity, needs, "
+            " casualties, access, authenticated, heard_at, tag) VALUES "
             "(:raw, :shelter, :reporter, :minutes, :occupancy, :capacity, :needs, "
-            ":casualties, :access, :authenticated, :heard_at)",
+            ":casualties, :access, :authenticated, :heard_at, :tag)",
             {
                 "raw": report_bytes.hex(),
+                "tag": bytes(tag_bytes).hex(),
                 "shelter": fields["shelter"],
                 "reporter": fields["reporter"],
                 "minutes": fields["minutes"],

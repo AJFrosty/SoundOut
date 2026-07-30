@@ -136,6 +136,33 @@ path, delivers it through a noisy channel, lists your audio devices, and flags a
 files left over from an older frame format. Audio recorded before a format change cannot
 decode and has to be regenerated — the check names those files.
 
+## Passing it on
+
+A station can repeat what it heard. That is the difference between this and a walkie-talkie:
+a shelter behind a hill reaches the base through a neighbour, and the two ends never have to
+be awake at the same moment.
+
+```
+python -m tools.relay --radio          # listen, remember, repeat
+python -m tools.relay --listen-only    # a plain receiver, for comparison
+python -m experiments.relaytest        # what relaying is worth
+```
+
+A relay forwards the original bytes including the reporter's tag, so it can choose what to
+repeat but never what to say - the base still verifies whoever first wrote the report.
+Each station repeats each observation **once**, which is what makes the traffic stop: with
+N stations an observation is transmitted at most N times, whatever the island looks like.
+When several are waiting they go out worst-first, by casualties, then life-safety needs,
+then being cut off.
+
+| minutes | no relay | relaying | what the geography allows |
+|---|---|---|---|
+| 3.6 | 41% | 59% | 92% |
+| 7.1 | 41% | 70% | 92% |
+| 28.6 | 41% | 79% | 92% |
+
+Without relaying the curve stops dead and waiting longer does not move it.
+
 ## Over a radio
 
 Through the air, sound reaches a few metres and no amount of signal processing changes

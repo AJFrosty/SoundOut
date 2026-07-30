@@ -17,8 +17,9 @@ MODULES = [
     "soundout.radio.wav", "soundout.radio.devices",
     "soundout.island.situation", "soundout.island.trust",
     "soundout.island.reports", "soundout.island.store", "soundout.island.validate",
+    "soundout.island.relay",
     "tools.report", "tools.receiver", "tools.listen", "tools.dashboard",
-    "tools.airtest", "tools.loopback", "tools.audiocheck",
+    "tools.airtest", "tools.loopback", "tools.audiocheck", "tools.relay",
 ]
 
 PASS = "ok  "
@@ -78,6 +79,50 @@ def check_pipeline():
     store.close()
     os.remove(temporary)
 
+    return healthy
+
+
+def check_relay():
+    from soundout.island import relay
+    from soundout.island.reports import build_report, ingest
+    from soundout.island.store import Store
+    from soundout.radio.link import transmit
+    from soundout.radio.tones import RATE
+
+    print("\na report survives being passed on")
+    original = build_report(reporter=1041, shelter=37, people=42, capacity=60,
+                            needs=["insulin"], casualties=2, access="impassable",
+                            minutes=1_234_567)
+
+    def over_air(payload, store):
+        signal = transmit(payload)
+        return ingest(np.concatenate([np.zeros(int(RATE * 0.3)), signal,
+                                      np.zeros(int(RATE * 0.3))]), store)
+
+    middle, base = Store(), Store()
+    healthy = True
+
+    healthy &= line(PASS if over_air(original, middle)["authentic"] else FAIL,
+                    "a station hears it")
+
+    waiting = relay.pending(middle)
+    healthy &= line(PASS if len(waiting) == 1 else FAIL,
+                    "it is queued to pass on", f"{len(waiting)} waiting")
+
+    if waiting:
+        healthy &= line(PASS if relay.payload_of(waiting[0]) == original else FAIL,
+                        "repeated byte for byte, tag included")
+
+        arrived = over_air(relay.payload_of(waiting[0]), base)
+        healthy &= line(PASS if arrived["authentic"] else FAIL,
+                        "the base still trusts the original reporter")
+
+        relay.mark_relayed(middle, waiting[0])
+        healthy &= line(PASS if not relay.pending(middle) else FAIL,
+                        "each station repeats it once", "which is what makes it stop")
+
+    middle.close()
+    base.close()
     return healthy
 
 
@@ -261,7 +306,7 @@ def main():
         raise SystemExit(1)
 
     print()
-    results = [check_imports(), check_pipeline(), check_noise(),
+    results = [check_imports(), check_pipeline(), check_relay(), check_noise(),
                check_field_page(), check_stale_audio()]
 
     if not args.skip_audio:
