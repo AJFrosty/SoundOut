@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+
+# Runtime state and generated audio — regenerate with report.py / message.py
+*.db
+*.wav
