@@ -136,6 +136,38 @@ path, delivers it through a noisy channel, lists your audio devices, and flags a
 files left over from an older frame format. Audio recorded before a format change cannot
 decode and has to be regenerated — the check names those files.
 
+## Over a radio
+
+Through the air, sound reaches a few metres and no amount of signal processing changes
+that. A radio carries the distance instead: the sound only has to cross the couple of
+centimetres from a phone speaker to a radio microphone at one end, and from the radio's
+speaker to a laptop microphone at the other.
+
+```
+python -m tools.report --shelter 37 --people 42 --radio
+python -m experiments.radiohop       # what a radio does to the signal
+```
+
+`--radio` puts a **wake-up tone** in front of the transmission. A radio has to be keyed to
+transmit, and voice-activated transmit (VOX) keys it on hearing sound - but VOX takes
+100-200 ms to open, and the first thing it would otherwise eat is the chirp that the whole
+receiver syncs on. The tone is 300 ms at 2600 Hz followed by a 100 ms gap: it exists to be
+destroyed, and by the time the chirp arrives the channel is already open.
+
+| VOX eats | without the tone | with it |
+|---|---|---|
+| 60 ms | 100% | 100% |
+| 120 ms | 0% | 100% |
+| 450 ms | 0% | 100% |
+
+It costs 0.40 s. In `field.html` it is a checkbox, on by default.
+
+Two practical notes. On amateur bands **encryption is prohibited**, so reports go out in
+the clear with an HMAC tag beside them - the tag proves who sent it and that nothing was
+altered, and hides nothing. FRS, PMR446 and CB need no licence at all. And radios compand
+hard: too loud clips, too quiet never opens VOX, so set the level with the receiver's
+meter running.
+
 ## Reaching further
 
 Slower modes integrate for longer and so hear a weaker signal. The receiver is not told

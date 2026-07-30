@@ -52,6 +52,11 @@
   button.send:disabled{opacity:.55;cursor:default}
   button.send.sending{background:var(--sea);color:#04211E}
 
+  .toggle{display:flex;gap:11px;align-items:flex-start;margin-bottom:14px;cursor:pointer;
+    font-size:.85rem;line-height:1.45;color:var(--muted)}
+  .toggle input{width:19px;height:19px;flex:none;margin-top:1px;accent-color:var(--sea)}
+  .toggle b{color:var(--text);font-weight:600}
+
   .readout{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
     word-break:break-all}
   .readout b{color:var(--text);font-weight:600}
@@ -122,6 +127,11 @@
 
   <div class="card">
     <h2>Transmission</h2>
+    <label class="toggle" for="radio">
+      <input id="radio" type="checkbox" checked>
+      <span><b>Sending through a radio</b><br>
+        Starts with a wake-up tone so VOX keys up before the data begins.</span>
+    </label>
     <div class="readout" id="readout">&nbsp;</div>
     <div class="status" id="status">Hold the phone near the radio microphone, then send.</div>
   </div>
@@ -268,6 +278,10 @@ function buildFrame(payload, parity=6){
 /* ---------- the modem ---------- */
 const RATE=44100, SYMBOL=0.02, TONES=[1000,1200,1400,1600];
 const CHIRP=0.1, CHIRP_LOW=800, CHIRP_HIGH=2400, GUARD=0.02;
+/* a radio's VOX takes a moment to key up and eats whatever it hears first. This tone is
+   there to be eaten. It sits above the chirp's sweep so the receiver cannot mistake it
+   for a preamble, and inside the band a voice radio will pass. */
+const WAKE=0.3, WAKE_GAP=0.1, WAKE_HZ=2600;
 
 function bytesToSymbols(bytes){
   const out=[];
@@ -275,12 +289,22 @@ function bytesToSymbols(bytes){
   return out;
 }
 
-function buildSignal(frame, amplitude=0.7){
+function buildSignal(frame, amplitude=0.7, radio=false){
   const symbols=bytesToSymbols(frame);
   const n=Math.round(RATE*CHIRP), guard=Math.round(RATE*GUARD),
         per=Math.round(RATE*SYMBOL);
-  const total=n+guard+symbols.length*per;
+  const lead=radio ? Math.round(RATE*(WAKE+WAKE_GAP)) : 0;
+  const total=lead+n+guard+symbols.length*per;
   const buffer=new Float32Array(total);
+
+  if(radio){
+    const tone=Math.round(RATE*WAKE), edge=Math.max(Math.round(tone*0.05),1);
+    for(let i=0;i<tone;i++){
+      let w=1;
+      if(i<edge) w=i/edge; else if(i>tone-edge) w=(tone-i)/edge;
+      buffer[i]=amplitude*w*Math.sin(2*Math.PI*WAKE_HZ*i/RATE);
+    }
+  }
 
   const taper=Math.round(n*0.1);
   for(let i=0;i<n;i++){
@@ -288,10 +312,10 @@ function buildSignal(frame, amplitude=0.7){
     const sweep=CHIRP_LOW*t+(CHIRP_HIGH-CHIRP_LOW)*t*t/(2*CHIRP);
     let w=1;
     if(i<taper) w=i/taper; else if(i>n-taper) w=(n-i)/taper;
-    buffer[i]=amplitude*w*Math.sin(2*Math.PI*sweep);
+    buffer[lead+i]=amplitude*w*Math.sin(2*Math.PI*sweep);
   }
 
-  let at=n+guard;
+  let at=lead+n+guard;
   for(const s of symbols){
     const f=TONES[s];
     for(let i=0;i<per;i++) buffer[at+i]=amplitude*Math.sin(2*Math.PI*f*i/RATE);
@@ -413,11 +437,14 @@ function refresh(){
 
   try{
     const {report,frame}=compose();
-    const seconds=(CHIRP+GUARD+frame.length*4*SYMBOL);
+    const radio=document.getElementById("radio").checked;
+    const seconds=(radio?WAKE+WAKE_GAP:0)+CHIRP+GUARD+frame.length*4*SYMBOL;
     document.getElementById("readout").innerHTML =
       `<b>${hex(report)}</b> + tag<br>${frame.length} bytes &middot; ${seconds.toFixed(2)} s of tone`;
     document.getElementById("send").disabled=false;
-    setStatus("Hold the phone near the radio microphone, then send.");
+    setStatus(radio
+      ? "Hold the phone to the radio microphone, key it, then send."
+      : "Hold the phone near the receiving microphone, then send.");
     return true;
   }catch(error){
     document.getElementById("readout").textContent="—";
@@ -444,7 +471,7 @@ document.getElementById("send").onclick=async ()=>{
   setStatus("transmitting…");
 
   try{
-    await play(buildSignal(frame));
+    await play(buildSignal(frame, 0.7, document.getElementById("radio").checked));
     setStatus("Sent. Ask the receiver to confirm it arrived.","ok");
   }catch(error){
     setStatus("Could not play audio: "+error.message,"err");

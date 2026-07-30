@@ -185,6 +185,21 @@ def check_field_page():
         else:
             healthy = line(PASS, f"{name} vector matches") and healthy
 
+    from soundout.radio import preamble
+
+    for name, constant, scale in (("WAKE", preamble.WAKE_MS, 1000),
+                                  ("WAKE_GAP", preamble.WAKE_GAP_MS, 1000),
+                                  ("WAKE_HZ", preamble.WAKE_HZ, 1)):
+        found = re.search(rf"\b{name}\s*=\s*([0-9.]+)", html)
+
+        if not found:
+            healthy = line(FAIL, f"{name} missing from the page") and healthy
+        elif abs(float(found.group(1)) * scale - constant) > 1e-6:
+            healthy = line(FAIL, f"{name} differs",
+                           f"page {found.group(1)}, this build {constant / scale}") and healthy
+        else:
+            healthy = line(PASS, f"{name} matches") and healthy
+
     if not healthy:
         print("\n  The page carries its own copy of the schema, crypto and framing, so its"
               "\n  own self-test only proves it agrees with itself. Regenerate the vectors"

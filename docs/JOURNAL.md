@@ -680,6 +680,104 @@ hard surface as a soundboard; and cupping something around the speaker to aim it
 
 ---
 
+## Weekend 7 - handing the sound to a radio
+
+**Goal:** the acoustic range is a few metres and no amount of DSP changes that. A radio
+carries the distance; sound only has to cross the two centimetres from a phone speaker to
+a radio microphone at one end, and from a radio speaker to a laptop microphone at the
+other. What breaks when a radio sits in the middle?
+
+### VOX eats the preamble
+
+A handheld radio has to be keyed to transmit. Voice-activated transmit keys it on hearing
+sound, which is what makes an unattended relay possible, but **VOX takes 100-200 ms to
+open and whatever arrives in that window is simply gone.** The first thing SoundOut sends
+is the 100 ms chirp, and the chirp is the only thing that establishes sync. Lose it and a
+perfectly good frame is unreadable.
+
+The fix is a **wake-up tone**: 300 ms of steady tone, then a 100 ms gap, then the ordinary
+transmission. The tone exists to be destroyed. VOX hang time - the radio stays keyed for a
+second or more after the audio stops - carries the channel across the gap.
+
+Simulating a radio (VOX clipping measured from the moment sound arrives, a 300-3000 Hz
+passband, companding, and a squelch crack at each end):
+
+| VOX eats | without wake tone | with wake tone |
+|---|---|---|
+| 0 ms | 100% | 100% |
+| 60 ms | 100% | 100% |
+| 120 ms | **0%** | 100% |
+| 250 ms | 0% | 100% |
+| 450 ms | 0% | 100% |
+| 550 ms | 0% | **0%** |
+
+It is a cliff, not a slope: either the chirp survives or nothing does. The tone costs
+**0.40 s** in every mode and buys tolerance up to 450 ms, comfortably past any VOX in a
+consumer radio. Past 400 ms of tone plus gap it fails again, which is the honest limit.
+
+Two things had to be checked rather than assumed. The tone sits at **2600 Hz, above the
+chirp's 800-2400 Hz sweep**, so the matched filter has nothing to lock onto; with no frame
+behind it a bare wake tone was found only 2 times in 40, and those at PSR 8.5 against a
+threshold of 8.0. And sync lands at **exactly +0 samples** from where it lands without the
+tone, so nothing downstream had to change.
+
+### The bug in the test, not the code
+
+The first VOX sweep showed the wake tone making no difference until 350 ms - suspiciously
+flat. The simulator was clipping from **sample zero**, so it was eating the leading silence
+rather than the chirp. Real VOX keys on hearing something. Once the clip was measured from
+the first sound above the threshold, the cliff appeared at 120 ms where the physics says it
+should.
+
+A second defect in the same file: fed silence the simulated radio returned **exact digital
+zeros**, and a block of zeros has no sidelobes, so the peak-to-sidelobe ratio went to
+infinity and invented preambles in silence - the same mistake already made once in
+`rangetest`. A real receiver always hisses, so the simulator now has a noise floor and
+cannot be perfectly silent.
+
+### An idea that was measured and thrown away
+
+A radio keying up makes a broadband crack. A crack correlates with a chirp, so the theory
+was that it could **outrank the real preamble and steal the sync**, and since `find_burst`
+returns only the strongest peak, the frame would be lost. The fix seemed obvious: offer the
+best three peaks and let the CRC decide which is real - the matched filter proposes, the
+frame check disposes.
+
+It was built, the PSR threshold was re-calibrated for the changed noise floor, and then it
+was tested against three scenarios:
+
+| scenario | 1 candidate | 3 candidates |
+|---|---|---|
+| squelch cracks at both ends | 100% | 100% |
+| static crash 4x the signal, mid-frame | 100% | 100% |
+| two shelters colliding in one window | 1.00 of 2 | 1.00 of 2 |
+
+**It never once helped.** The reason is the same processing gain that makes the whole
+system work: a matched filter adds the chirp up coherently across its entire length, while
+an impulse only accumulates as a square root. A crack four times louder than the signal
+still loses, every time. Cracks do raise false alarms when no frame is present - a bare
+squelch crack was found 19 times in 40 - but a false alarm costs one failed decode and is
+caught by the CRC, which is what the CRC is for.
+
+The code was **reverted**. Complexity that cannot be shown to earn its place is complexity
+that will be wrong later without anyone noticing. The measurement survives in
+`experiments/radiohop.py` and the reasoning survives in a comment on `find_burst`, so the
+next person to have the same good idea can see that it was already tried.
+
+### Operating a real radio hop
+
+- **Licensing.** On amateur bands, encryption is prohibited. SoundOut transmits the report
+  in the clear with an HMAC tag beside it: the tag proves who sent it and that nobody
+  altered it, and deliberately hides nothing. FRS, PMR446 and CB need no licence and avoid
+  the question for a demonstration.
+- **Coupling.** Phone speaker to radio microphone, and radio speaker to laptop microphone.
+  Two centimetres of air at each end. A cable is tidier but changes nothing that matters.
+- **Levels.** Radios compand hard. Too loud and the audio clips; too quiet and VOX never
+  opens. The receiver's level meter is the instrument for setting this.
+- **Repeaters** turn line of sight into island coverage, and cost nothing to use.
+
+---
+
 ## Files
 
 Laid out along the seam in the design: the radio half does not know what a shelter is, and
@@ -692,7 +790,7 @@ the island half does not know what a tone is.
 | `soundout/radio/framing.py` | bytes to symbols, triple length, CRC-8, Reed-Solomon wrapping |
 | `soundout/radio/reedsolomon.py` | GF(256) arithmetic and the Reed-Solomon codec |
 | `soundout/radio/link.py` | transmit and receive a frame |
-| `soundout/radio/channel.py` | a simulated channel for testing without hardware |
+| `soundout/radio/channel.py` | a simulated channel, and a simulated radio |
 | `soundout/radio/devices.py` | finding an input and output on the same host API |
 | `soundout/radio/wav.py` | wav reading and writing |
 | `soundout/island/situation.py` | the 12-byte schema and its bit packing |
@@ -716,6 +814,7 @@ refactor changed nothing.
 - [x] Real hardware: speaker to microphone, decoded exactly
 - [x] Long-range modes, worth 5 dB and roughly double the distance
 - [ ] Measure the speaker and microphone response, move the tones if it pays
+- [x] A wake-up tone so VOX cannot eat the preamble, 0.40 s for 450 ms of tolerance
 - [ ] Across a room, then over a radio
 - [x] The 12-byte situation schema, replacing free text
 - [x] Authentication: HMAC tags for reports, Ed25519 for authority broadcasts

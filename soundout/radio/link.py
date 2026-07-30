@@ -9,7 +9,7 @@ from .framing import (
     parse_frame,
     symbols_to_bytes,
 )
-from .preamble import chirp, find_burst, guard
+from .preamble import chirp, find_burst, guard, wake
 from .tones import (
     MODES,
     RATE,
@@ -25,7 +25,7 @@ LENGTH_SYMBOLS = 4 * LENGTH_COPIES
 
 
 def transmit(payload, rate=RATE, amplitude=0.5, parity_bytes=PARITY_BYTES,
-             mode="fast", tones=TONES):
+             mode="fast", tones=TONES, radio=False):
     if isinstance(payload, str):
         payload = payload.encode("utf-8")
 
@@ -33,7 +33,9 @@ def transmit(payload, rate=RATE, amplitude=0.5, parity_bytes=PARITY_BYTES,
     frame = build_frame(payload, parity_bytes)
     symbols = bytes_to_symbols(frame)
 
-    return np.concatenate([
+    parts = [wake(rate, amplitude=amplitude)] if radio else []
+
+    return np.concatenate(parts + [
         chirp(rate, settings["chirp_ms"], amplitude=amplitude),
         guard(rate),
         encode(symbols, tones, rate, settings["symbol_ms"], amplitude),
@@ -129,8 +131,8 @@ def duration_seconds(payload_length, rate=RATE, mode="fast"):
             + symbols * symbol_length(rate, settings["symbol_ms"]) / rate)
 
 
-def _send(text, wav_path, play, amplitude, mode="fast"):
-    signal = transmit(text, amplitude=amplitude, mode=mode)
+def _send(text, wav_path, play, amplitude, mode="fast", radio=False):
+    signal = transmit(text, amplitude=amplitude, mode=mode, radio=radio)
     padded = np.concatenate([np.zeros(int(RATE * 0.3)), signal, np.zeros(int(RATE * 0.3))])
 
     print(f"message : \"{text}\"")
@@ -161,8 +163,14 @@ def _decode(wav_path):
           f"(PSR {result['burst']['psr']:.1f}, match {result['burst']['match']:.3f})")
 
     if result["ok"]:
+        payload = result["payload"]
+        # a situation report is packed binary, not text: printing it as characters puts
+        # replacement marks through a console that cannot encode them
+        readable = all(32 <= byte < 127 for byte in payload)
+
         print(f"mode      : {result['mode']} ({result['symbol_ms']} ms symbols)")
-        print(f"decoded   : \"{result['text']}\"")
+        print(f"decoded   : \"{result['text']}\"" if readable
+              else f"decoded   : {len(payload)} bytes ({payload.hex()})")
         repaired = result.get("corrected", 0)
         print(f"repaired  : {repaired} damaged byte{'' if repaired == 1 else 's'}")
         print(f"margin    : {result['median_margin']:.1f}x")
@@ -180,6 +188,8 @@ if __name__ == "__main__":
     parser.add_argument("--amplitude", type=float, default=0.4)
     parser.add_argument("--mode", type=str, default="fast", choices=list(MODES),
                         help="slower modes reach further")
+    parser.add_argument("--radio", action="store_true",
+                        help="lead with a tone that keys a VOX radio")
     parser.add_argument("--decode", type=str, default=None,
                         help="decode a wav file instead of sending")
     args = parser.parse_args()
@@ -198,4 +208,4 @@ if __name__ == "__main__":
             amplitude = validate.fraction(args.amplitude, "amplitude", 0.05, 1.0)
         except validate.Invalid as error:
             raise SystemExit(f"error: {error}")
-        _send(args.text, args.wav, args.play, amplitude, args.mode)
+        _send(args.text, args.wav, args.play, amplitude, args.mode, args.radio)

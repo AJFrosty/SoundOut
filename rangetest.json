@@ -1,0 +1,170 @@
+[
+ {
+  "distance": 4.0,
+  "note": "quiet",
+  "peak": 1.0,
+  "clipped": 0.0,
+  "heard": 3,
+  "decoded": 0,
+  "median_psr": 151.0,
+  "events": [
+   {
+    "mode": "fast",
+    "psr": 567.3,
+    "match": 0.803,
+    "decoded": false,
+    "reason": "signal ended before the length byte",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 151.0,
+    "match": 0.624,
+    "decoded": false,
+    "reason": "error locations could not be resolved",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 25.8,
+    "match": 0.103,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   }
+  ],
+  "at": "2026-07-30 13:32"
+ },
+ {
+  "distance": 4.0,
+  "note": "quiet",
+  "peak": 0.995,
+  "clipped": 0.0,
+  "heard": 15,
+  "decoded": 1,
+  "median_psr": 20.3,
+  "events": [
+   {
+    "mode": "fast",
+    "psr": 83.9,
+    "match": 0.816,
+    "decoded": true,
+    "reason": null,
+    "margin": 11.0
+   },
+   {
+    "mode": "fast",
+    "psr": 42.3,
+    "match": 0.543,
+    "decoded": false,
+    "reason": "error locations could not be resolved",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 33.5,
+    "match": 0.368,
+    "decoded": false,
+    "reason": "error locations could not be resolved",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 21.7,
+    "match": 0.118,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 20.4,
+    "match": 0.111,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "far",
+    "psr": 20.7,
+    "match": 0.058,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 20.3,
+    "match": 0.119,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "far",
+    "psr": 20.6,
+    "match": 0.086,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 20.1,
+    "match": 0.098,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 16.6,
+    "match": 0.103,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "far",
+    "psr": 14.6,
+    "match": 0.054,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 15.2,
+    "match": 0.077,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 15.1,
+    "match": 0.099,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 12.4,
+    "match": 0.07,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   },
+   {
+    "mode": "fast",
+    "psr": 9.3,
+    "match": 0.086,
+    "decoded": false,
+    "reason": "the three length bytes all disagree",
+    "margin": null
+   }
+  ],
+  "at": "2026-07-30 13:33"
+ }
+]

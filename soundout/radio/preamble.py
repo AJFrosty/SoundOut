@@ -7,6 +7,10 @@ CHIRP_LOW = 800
 CHIRP_HIGH = 2400
 GUARD_MS = 20
 
+WAKE_MS = 300
+WAKE_GAP_MS = 100
+WAKE_HZ = 2600
+
 
 def chirp(rate=RATE, duration_ms=CHIRP_MS, low=CHIRP_LOW, high=CHIRP_HIGH, amplitude=0.5):
     n = int(rate * duration_ms / 1000)
@@ -26,6 +30,27 @@ def chirp(rate=RATE, duration_ms=CHIRP_MS, low=CHIRP_LOW, high=CHIRP_HIGH, ampli
 
 def guard(rate=RATE, duration_ms=GUARD_MS):
     return np.zeros(int(rate * duration_ms / 1000))
+
+
+def wake(rate=RATE, duration_ms=WAKE_MS, gap_ms=WAKE_GAP_MS, freq=WAKE_HZ, amplitude=0.7):
+    """A throwaway tone that keys a radio before anything worth hearing is sent.
+
+    VOX takes a moment to open, and whatever arrives first is chewed. The frequency sits
+    above the chirp's 800-2400 Hz sweep so it cannot feed the matched filter, and inside
+    the 300-3400 Hz band a voice radio will pass. The gap that follows lets the
+    transmitter settle while VOX hang time keeps the channel open.
+    """
+    samples = int(rate * duration_ms / 1000)
+    t = np.arange(samples) / rate
+
+    taper = max(int(samples * 0.05), 1)
+    window = np.ones(samples)
+    window[:taper] = np.linspace(0, 1, taper)
+    window[-taper:] = np.linspace(1, 0, taper)
+
+    tone = amplitude * window * np.sin(2 * np.pi * freq * t)
+
+    return np.concatenate([tone, np.zeros(int(rate * gap_ms / 1000))])
 
 
 def matched_filter(signal, template):
@@ -61,6 +86,14 @@ def peak_to_sidelobe(magnitude, peak, guard):
 
 
 def find_burst(signal, template=None, rate=RATE, guard_ms=GUARD_MS, min_psr=8.0):
+    """Find where the chirp starts.
+
+    Only the strongest peak is considered. Trying the next-best few as well was built
+    and measured, on the theory that a radio keying up cracks broadband and could
+    outrank the chirp; it could not. The matched filter integrates the chirp coherently
+    over its whole length, while an impulse only adds up as a square root, so a crack
+    four times louder than the signal still lost. The extra machinery was removed.
+    """
     if template is None:
         template = chirp(rate)
 
