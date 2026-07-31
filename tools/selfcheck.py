@@ -300,6 +300,49 @@ def check_field_page():
     return healthy
 
 
+def check_folder_docs():
+    """Every folder explains itself, and the explanation still matches what is there.
+
+    A README that names a file which has since been renamed is worse than no README,
+    because it is believed. This is the same drift that made field.html quietly wrong.
+    """
+    import re
+
+    root = _Path(__file__).resolve().parents[1]
+    print("\nevery folder explains itself")
+    healthy = True
+
+    for folder in ("soundout", "soundout/radio", "soundout/island", "tools",
+                   "experiments", "docs"):
+        here = root / folder
+        readme = here / "README.md"
+
+        if not readme.exists():
+            healthy = line(FAIL, f"{folder}/README.md is missing") and healthy
+            continue
+
+        text = readme.read_text(encoding="utf-8")
+        named = {n for n in re.findall(r"`([A-Za-z_][\w]*\.(?:py|md|svg|html))`", text)}
+        missing = sorted(n for n in named if not (here / n).exists()
+                         and not (root / n).exists())
+
+        # and the other way round: a file nobody has written a line about
+        present = {f.name for f in here.glob("*.py")} | {f.name for f in here.glob("*.svg")}
+        present -= {"__init__.py"}
+        undocumented = sorted(present - named)
+
+        if missing:
+            healthy = line(FAIL, f"{folder}/README.md names files that are gone",
+                           ", ".join(missing)) and healthy
+        elif undocumented:
+            healthy = line(FAIL, f"{folder} has undocumented files",
+                           ", ".join(undocumented)) and healthy
+        else:
+            healthy = line(PASS, f"{folder}", f"{len(named)} file(s) described") and healthy
+
+    return healthy
+
+
 def check_audio_devices():
     print("\naudio devices")
     try:
@@ -355,7 +398,7 @@ def main():
     print()
     results = [check_imports(), check_pipeline(), check_relay(),
                check_authority(), check_noise(),
-               check_field_page(), check_stale_audio()]
+               check_field_page(), check_folder_docs(), check_stale_audio()]
 
     if not args.skip_audio:
         results.append(check_audio_devices())

@@ -16,38 +16,27 @@ and the island half does not know what a tone is.**
 
 ```
 soundout/radio/     getting bytes through the air
-  tones.py          4-FSK encoder, Goertzel detector
-  preamble.py       chirp, matched filter, detection statistics
-  framing.py        bytes to symbols, length, CRC-8
-  link.py           transmit and receive a frame
-  channel.py        a simulated channel, for testing without hardware
-  wav.py            read and write wav files
-
-soundout/island/    what the bytes mean
-  situation.py      the 12-byte schema and its bit packing
-  trust.py          HMAC tags for reports, Ed25519 for authority broadcasts
-  reports.py        compose, authenticate, ingest
-  store.py          the observation set and the fold that becomes the picture
-
-tools/              things a human runs
-  report.py         compose and transmit a situation report
-  receiver.py       listen continuously, authenticate, merge
-  dashboard.py      the island picture on localhost
-  listen.py         record once and decode whatever is heard
-  airtest.py        play and record at the same time
-  loopback.py       raw symbol burst, kept because it documents the first failure
-  audiocheck.py     which input devices actually capture
-
+soundout/island/    what those bytes mean
+tools/              the programs a person runs
 experiments/        the measurements behind every claim in the journal
-  selftest.py       bin alignment, amplitude, rejection, noise, timing
-  synctest.py       energy threshold against matched filter
-  calibrate.py      where the detection threshold came from
-  schematest.py     schema round trip, overflow, forgery, airtime
-  storetest.py      order independence, idempotence, tie breaks
-  demotest.py       four reports over a noisy channel into one picture
-
-docs/JOURNAL.md     the reasoning, the measurements and the failures
+docs/               the journal, the chart, the logo
+field.html          a shelter's transmitter, one file, works offline
 ```
+
+Every folder has its own README describing each file in it and what it is for:
+
+| folder | what is in it |
+|---|---|
+| [`soundout/`](soundout/README.md) | how the two halves fit together, and the whole path end to end |
+| [`soundout/radio/`](soundout/radio/README.md) | tones, preamble, framing, error correction, the simulated channel |
+| [`soundout/island/`](soundout/island/README.md) | the schema, the two tiers of trust, the store, relaying, orders |
+| [`tools/`](tools/README.md) | report, receive, relay, broadcast, dashboard, and the diagnostics |
+| [`experiments/`](experiments/README.md) | every measurement, including the ones that proved an idea wrong |
+| [`docs/`](docs/README.md) | the journal weekend by weekend, and how to regenerate the chart |
+
+`python -m tools.selfcheck` checks that those READMEs still match what is actually in each
+folder, so a renamed file fails the build rather than quietly leaving the documentation
+lying.
 
 Nothing needs installing. Every tool works either way:
 
