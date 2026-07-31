@@ -34,6 +34,9 @@ Every folder has its own README describing each file in it and what it is for:
 | [`experiments/`](experiments/README.md) | every measurement, including the ones that proved an idea wrong |
 | [`docs/`](docs/README.md) | the journal weekend by weekend, and how to regenerate the chart |
 
+**Getting a radio working:** [`docs/RADIO.md`](docs/RADIO.md) is the step-by-step, from
+what to buy through to finding your actual range.
+
 `python -m tools.selfcheck` checks that those READMEs still match what is actually in each
 folder, so a renamed file fails the build rather than quietly leaving the documentation
 lying.
