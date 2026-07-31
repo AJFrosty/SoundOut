@@ -7,8 +7,8 @@ again from the beginning.
 The most important thing to understand before you start: **the sound only ever has to
 cross about two centimetres.** Phone speaker to radio microphone at one end, radio speaker
 to laptop microphone at the other. The radio carries the distance. Nothing in the software
-is trying to make sound travel across the island — that was never going to work, and
-weekend 7 of the journal is where that was accepted.
+is trying to make sound travel across the island — through open air the range is a few
+metres and no amount of signal processing changes that.
 
 ```
   phone                  radio  ~~~~~~~~~ radio                laptop

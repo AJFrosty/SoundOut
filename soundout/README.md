@@ -47,7 +47,8 @@ Nothing in `radio` imports from `island`. The dependency only runs one way.
 - **How does the sound work?** `radio/tones.py`, then `radio/preamble.py`.
 - **What is actually being said?** `island/situation.py`.
 - **How does the base end up with a correct picture?** `island/store.py`.
-- **Why is any of it like this?** `docs/JOURNAL.md`.
+- **Why is any of it like this?** `experiments/`, where each measurement is a file you
+  can run.
 
 Each folder has its own README with the file-by-file breakdown and the things to know
 before changing anything in it.

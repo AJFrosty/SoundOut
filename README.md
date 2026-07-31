@@ -18,8 +18,8 @@ and the island half does not know what a tone is.**
 soundout/radio/     getting bytes through the air
 soundout/island/    what those bytes mean
 tools/              the programs a person runs
-experiments/        the measurements behind every claim in the journal
-docs/               the journal, the chart, the logo
+experiments/        the measurements behind every design decision
+docs/               the radio guide, the chart, the logo
 field.html          a shelter's transmitter, one file, works offline
 ```
 
@@ -32,7 +32,7 @@ Every folder has its own README describing each file in it and what it is for:
 | [`soundout/island/`](soundout/island/README.md) | the schema, the two tiers of trust, the store, relaying, orders |
 | [`tools/`](tools/README.md) | report, receive, relay, broadcast, dashboard, and the diagnostics |
 | [`experiments/`](experiments/README.md) | every measurement, including the ones that proved an idea wrong |
-| [`docs/`](docs/README.md) | the journal weekend by weekend, and how to regenerate the chart |
+| [`docs/`](docs/README.md) | connecting a radio, and how to regenerate the chart |
 
 **Getting a radio working:** [`docs/RADIO.md`](docs/RADIO.md) is the step-by-step, from
 what to buy through to finding your actual range.
@@ -298,4 +298,9 @@ frames, and a convergent picture across 200 random orderings. Proven on real har
 a signed report played through a headset earpiece, captured by that headset's microphone,
 and decoded exactly.
 
-Not done yet: forward error correction, a handheld radio hop, and the mobility simulation.
+Since then: Reed-Solomon error correction, long-range modes worth 5 dB, a VOX wake-up
+tone so a radio cannot eat the preamble, store-and-forward relaying, signed orders
+travelling back out, and the comparison against a runner and a phone network.
+
+Not done yet: a hop over an actual handheld radio. The software side is built and
+measured against a simulated one - see docs/RADIO.md - but no radio has been bought.

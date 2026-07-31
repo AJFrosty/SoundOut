@@ -2,9 +2,9 @@
 
 Nothing here is needed to run SoundOut. Everything here is why the design is the way it is.
 
-Each file answers one question with a number, and the numbers are what `docs/JOURNAL.md`
-is written from. Several of them exist because a decision that seemed obvious turned out to
-be wrong when it was finally measured — which is the point of keeping them runnable rather
+Each file answers one question with a number, and those numbers are where every design
+decision came from. Several exist because a decision that seemed obvious turned out to be
+wrong when it was finally measured — which is the point of keeping them runnable rather
 than writing the results down once and moving on.
 
 Run any of them directly:
